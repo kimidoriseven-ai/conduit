@@ -1,0 +1,588 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>投稿管理 — 業者</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic UI',sans-serif; background:#F5F5F5; color:#1a1a1a; -webkit-font-smoothing:antialiased; }
+    .screen { display:none; min-height:100dvh; flex-direction:column; }
+    .screen.active { display:flex; }
+    .scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    .grad { background:linear-gradient(135deg,#833AB4 0%,#E1306C 50%,#F77737 100%); }
+
+    .header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:0.5px solid #E8E8E8; background:#fff; position:sticky; top:0; z-index:10; }
+    .hback { font-size:28px; color:#999; line-height:1; padding:2px 8px 2px 0; cursor:pointer; }
+    .htitle { font-size:15px; font-weight:600; letter-spacing:0.01em; }
+
+    .btn-g { width:100%; padding:15px; border-radius:28px; border:none; background:linear-gradient(135deg,#833AB4,#E1306C,#F77737); color:#fff; font-size:15px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .btn-o { width:100%; padding:13px; border-radius:28px; border:1px solid #DDD; background:#fff; color:#888; font-size:14px; cursor:pointer; font-family:inherit; }
+
+    .card { background:#fff; border-radius:18px; border:0.5px solid #E8E8E8; padding:14px 16px; }
+    input[type=text], input[type=email], input[type=password], input[type=datetime-local], textarea {
+      width:100%; border:0.5px solid #DDD; border-radius:12px; padding:10px 12px; font-size:15px; font-family:inherit; background:#fff; color:#1a1a1a; line-height:1.7; }
+    textarea { resize:none; }
+    input:focus, textarea:focus { outline:none; border-color:#833AB4; }
+    label.lbl { display:block; font-size:11px; color:#AAA; font-weight:700; letter-spacing:0.08em; margin-bottom:6px; }
+
+    /* Status badges */
+    .badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+    .b-wait { background:#FFF3CD; color:#856404; }
+    .b-fb   { background:#FFEBEB; color:#E24B4A; }
+    .b-rev  { background:#E8F4FD; color:#0055BB; }
+    .b-done { background:#E6F9F0; color:#00A651; }
+    .b-ok   { background:#E6F9F0; color:#00A651; }
+    .b-ng   { background:#FFEBEB; color:#E24B4A; }
+
+    /* Photo grid upload slots */
+    .upload-slot { border:1.5px dashed #CCC; border-radius:12px; aspect-ratio:4/5; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; position:relative; background:#FAFAFA; transition:border-color 0.15s; }
+    .upload-slot.filled { border:0.5px solid #E8E8E8; }
+    .upload-slot img { width:100%; height:100%; object-fit:cover; position:absolute; inset:0; }
+    .slot-num { font-size:10px; color:#BBB; font-weight:700; margin-top:5px; }
+  </style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="s-login" class="screen active">
+  <div class="scroll" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 28px;gap:22px;">
+    <div class="grad" style="width:60px;height:60px;border-radius:16px;display:flex;align-items:center;justify-content:center;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="12" r="3.5"/><circle cx="17.5" cy="6.5" r="0.9" fill="#fff" stroke="none"/></svg>
+    </div>
+    <div style="text-align:center;">
+      <p style="font-size:11px;color:#BBB;letter-spacing:0.14em;margin-bottom:10px;">投稿管理ツール</p>
+      <h1 style="font-size:24px;font-weight:500;letter-spacing:-0.02em;">ログイン</h1>
+    </div>
+    <div style="width:100%;display:flex;flex-direction:column;gap:10px;">
+      <div><label class="lbl">メールアドレス</label><input type="email" value="demo@example.com"></div>
+      <div><label class="lbl">パスワード</label><input type="password" value="password"></div>
+    </div>
+    <button class="btn-g" onclick="goDash()">ログイン</button>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="s-dashboard" class="screen">
+  <div class="header">
+    <div style="width:40px;"></div>
+    <span class="htitle">案件一覧</span>
+    <button onclick="goStep1()" style="padding:7px 14px;border-radius:20px;border:none;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">＋ 新規</button>
+  </div>
+  <div class="scroll" style="padding:14px 14px 32px;">
+    <!-- Stats -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;" id="stat-cards"></div>
+    <!-- Cases -->
+    <p style="font-size:11px;color:#BBB;font-weight:700;letter-spacing:0.08em;margin-bottom:8px;">案件</p>
+    <div id="cases-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
+</div>
+
+<!-- ===== STEP 1: 写真アップロード ===== -->
+<div id="s-step1" class="screen">
+  <div class="header">
+    <span class="hback" onclick="goDash()">✕</span>
+    <span class="htitle">新しい案件</span>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="scroll" style="padding:14px 14px 32px;">
+    <div id="step-bar-1"></div>
+    <div class="card" style="margin-bottom:14px;">
+      <label class="lbl">クライアント名</label>
+      <input type="text" id="new-client-name" placeholder="例：田中様">
+    </div>
+    <p style="font-size:11px;color:#AAA;font-weight:700;letter-spacing:0.07em;margin-bottom:8px;">投稿予定写真（6枚）</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;" id="post-slots"></div>
+    <p style="font-size:11px;color:#AAA;font-weight:700;letter-spacing:0.07em;margin-bottom:8px;">差し替え候補（2枚）</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:24px;" id="cand-slots"></div>
+    <button class="btn-g" id="step1-next" onclick="goStep2()">次へ：キャプション入力 →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 2: キャプション ===== -->
+<div id="s-step2" class="screen">
+  <div class="header">
+    <span class="hback" onclick="goStep1()">‹</span>
+    <span class="htitle">新しい案件</span>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="scroll" style="padding:14px 14px 32px;">
+    <div id="step-bar-2"></div>
+    <div class="card" style="margin-bottom:12px;">
+      <label class="lbl">キャプション</label>
+      <textarea id="new-caption" rows="5" placeholder="投稿に使うキャプションを入力してください" oninput="document.getElementById('cap-count').textContent=this.value.length"></textarea>
+      <p style="font-size:10px;color:#CCC;text-align:right;margin-top:4px;"><span id="cap-count">0</span> / 2200文字</p>
+    </div>
+    <div class="card" style="margin-bottom:24px;">
+      <label class="lbl">ハッシュタグ</label>
+      <textarea id="new-hashtags" rows="3" placeholder="#ハッシュタグ #ハッシュタグ" style="color:#833AB4;" oninput="updateHashCount(this.value)"></textarea>
+      <p style="font-size:10px;color:#CCC;text-align:right;margin-top:4px;"><span id="hash-count">0</span> / 30個</p>
+    </div>
+    <button class="btn-g" onclick="goStep3()">次へ：投稿日時・URL発行 →</button>
+    <div style="height:10px;"></div>
+    <button class="btn-o" onclick="goStep1()">戻る</button>
+  </div>
+</div>
+
+<!-- ===== STEP 3: 日時 + URL ===== -->
+<div id="s-step3" class="screen">
+  <div class="header">
+    <span class="hback" onclick="goStep2()">‹</span>
+    <span class="htitle">新しい案件</span>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="scroll" style="padding:14px 14px 32px;">
+    <div id="step-bar-3"></div>
+    <div class="card" style="margin-bottom:14px;">
+      <label class="lbl">投稿予定日時</label>
+      <input type="datetime-local" id="new-postdate">
+    </div>
+    <!-- URL section -->
+    <div id="url-section" style="display:none;">
+      <div class="card" style="margin-bottom:12px;">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">
+          <div class="grad" style="width:38px;height:38px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <div>
+            <p style="font-size:13px;font-weight:600;margin-bottom:2px;">確認URLを発行しました</p>
+            <p style="font-size:11px;color:#AAA;">有効期限：7日間</p>
+          </div>
+        </div>
+        <label class="lbl">クライアント確認URL</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="url-display" readonly style="font-size:12px;color:#555;background:#F5F5F5;flex:1;">
+          <button onclick="copyUrl()" style="flex-shrink:0;padding:10px 14px;border-radius:12px;border:none;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;" id="copy-btn">コピー</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:24px;">
+        <button onclick="shareLine()" style="flex:1;padding:12px;border-radius:20px;border:0.5px solid #E8E8E8;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;color:#1a1a1a;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06C755" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          LINEで送る
+        </button>
+        <button onclick="copyUrl()" style="flex:1;padding:12px;border-radius:20px;border:0.5px solid #E8E8E8;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;color:#1a1a1a;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          URLをコピー
+        </button>
+      </div>
+      <button class="btn-g" onclick="finishNewCase()">ダッシュボードへ</button>
+    </div>
+    <div id="generate-btn-wrap">
+      <button class="btn-g" onclick="generateUrl()">URLを発行する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CASE DETAIL ===== -->
+<div id="s-case-detail" class="screen">
+  <div class="header">
+    <span class="hback" onclick="goDash()">‹</span>
+    <span class="htitle" id="detail-title">案件詳細</span>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="scroll" style="padding:14px 14px 32px;">
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<!-- ===== FEEDBACK VIEW ===== -->
+<div id="s-feedback" class="screen">
+  <div class="header">
+    <span class="hback" onclick="showScreen('s-case-detail')">‹</span>
+    <span class="htitle">フィードバック確認</span>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="scroll" style="padding:14px 14px 32px;">
+    <div id="feedback-content"></div>
+  </div>
+</div>
+
+<script>
+// =====================
+// DATA
+// =====================
+var PCSS = {
+  pc1:'background:linear-gradient(135deg,#FF9A9E,#FAD0C4)',
+  pc2:'background:linear-gradient(135deg,#A1C4FD,#C2E9FB)',
+  pc3:'background:linear-gradient(135deg,#D4FC79,#96E6A1)',
+  pc4:'background:linear-gradient(135deg,#FDCB6E,#E17055)',
+  pc5:'background:linear-gradient(135deg,#B2FEFA,#0ED2F7)',
+  pc6:'background:linear-gradient(135deg,#F7971E,#FFD200)',
+  pc7:'background:linear-gradient(135deg,#E0C3FC,#8EC5FC)',
+  pc8:'background:linear-gradient(135deg,#FBC2EB,#A6C1EE)'
+};
+
+var cases = [
+  {
+    id:0, clientName:'田中様', month:'2026年5月', status:'wait',
+    photos: Array(8).fill(null),
+    caption:'今日はおすすめの〇〇をご紹介します✨ ぜひチェックしてみてください！',
+    hashtags:'#〇〇 #おすすめ #日常',
+    postDate:'2026-05-20T10:00', url:'https://confirm.example.com/c/a3f9b2',
+    feedbacks:[]
+  },
+  {
+    id:1, clientName:'佐藤様', month:'2026年5月', status:'fb',
+    photos: Array(8).fill(null),
+    caption:'週末はゆっくり〇〇を楽しんで☕ こちらはいかがですか？',
+    hashtags:'#週末 #〇〇 #リラックス',
+    postDate:'2026-05-22T12:00', url:'https://confirm.example.com/c/b7c3d1',
+    feedbacks:[
+      {
+        reviewerName:'佐藤 太郎',
+        submittedAt:'2026年5月14日 19:05',
+        results:[
+          {status:'ok', comment:'', replace:null, hasDrawing:false},
+          {status:'ok', comment:'', replace:null, hasDrawing:false},
+          {status:'ok', comment:'', replace:null, hasDrawing:false},
+          {status:'ok', comment:'', replace:null, hasDrawing:false},
+          {status:'ok', comment:'', replace:null, hasDrawing:false},
+          {status:'ok', comment:'', replace:null, hasDrawing:false}
+        ],
+        overallComment:'私は全部OKです。'
+      },
+      {
+        reviewerName:'佐藤 花子',
+        submittedAt:'2026年5月15日 14:32',
+        results:[
+          {status:'ok', comment:'', replace:null, hasDrawing:false},
+          {status:'ng', comment:'もう少し明るい写真にしてください', replace:0, hasDrawing:true},
+          {status:'ok', comment:'', replace:null, hasDrawing:false},
+          {status:'ng', comment:'', replace:1, hasDrawing:false},
+          {status:'ok', comment:'', replace:null, hasDrawing:false},
+          {status:'ok', comment:'', replace:null, hasDrawing:false}
+        ],
+        overallComment:'全体的にはいい感じです！よろしくお願いします。'
+      }
+    ]
+  },
+  {
+    id:2, clientName:'山本様', month:'2026年4月', status:'done',
+    photos: Array(8).fill(null),
+    caption:'春の〇〇特集🌸',
+    hashtags:'#春 #〇〇 #季節',
+    postDate:'2026-04-15T11:00', url:'https://confirm.example.com/c/c9e4f2',
+    feedbacks:[]
+  }
+];
+
+var newCase = { clientName:'', photos:Array(8).fill(null), caption:'', hashtags:'', postDate:'', url:'' };
+var currentCaseId = -1;
+
+// =====================
+// NAVIGATION
+// =====================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+function goDash()  { renderDash(); showScreen('s-dashboard'); }
+function goStep1() { renderStep(1); showScreen('s-step1'); }
+function goStep2() { renderStep(2); showScreen('s-step2'); }
+function goStep3() {
+  renderStep(3); showScreen('s-step3');
+  document.getElementById('url-section').style.display='none';
+  document.getElementById('generate-btn-wrap').style.display='block';
+  var el = document.getElementById('new-postdate');
+  if (!el.value) {
+    var now = new Date();
+    var y = now.getFullYear();
+    var m = String(now.getMonth()+1).padStart(2,'0');
+    var d = String(now.getDate()).padStart(2,'0');
+    el.value = y + '-' + m + '-' + d + 'T18:00';
+  }
+}
+function goCase(id) { currentCaseId=id; renderCaseDetail(id); showScreen('s-case-detail'); }
+function goFeedback() { renderFeedback(currentCaseId); showScreen('s-feedback'); }
+
+// =====================
+// STEP BAR
+// =====================
+function renderStepBar(el, active) {
+  var steps = ['写真','キャプション','日時・URL'];
+  var G = 'linear-gradient(135deg,#833AB4,#E1306C,#F77737)';
+  var html = '<div style="display:flex;align-items:center;margin:4px 0 18px;">';
+  steps.forEach(function(s,i) {
+    var on = i < active;
+    var cur = i === active - 1;
+    html += '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;">'
+      + '<div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:' + (on ? G : '#EEE') + ';color:' + (on ? '#fff' : '#BBB') + ';">' + (i+1) + '</div>'
+      + '<span style="font-size:10px;font-weight:600;letter-spacing:0.03em;color:' + (on ? '#555' : '#CCC') + ';">' + s + '</span></div>';
+    if (i < steps.length-1) html += '<div style="flex:1;height:2px;background:' + (i < active-1 ? G : '#EEE') + ';margin-bottom:16px;border-radius:1px;"></div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// =====================
+// RENDER DASHBOARD
+// =====================
+function renderDash() {
+  var counts = {wait:0, fb:0, rev:0, done:0};
+  cases.forEach(function(c){ counts[c.status]++; });
+  var stats = document.getElementById('stat-cards');
+  stats.innerHTML = [
+    {l:'確認待ち', n:counts.wait, cls:'b-wait'},
+    {l:'FB受信', n:counts.fb, cls:'b-fb'},
+    {l:'完了', n:counts.done, cls:'b-done'}
+  ].map(function(s){
+    return '<div style="background:#fff;border-radius:14px;border:0.5px solid #E8E8E8;padding:12px;text-align:center;">'
+      + '<p style="font-size:22px;font-weight:600;margin-bottom:2px;">' + s.n + '</p>'
+      + '<p style="font-size:10px;color:#888;">' + s.l + '</p></div>';
+  }).join('');
+
+  var BADGE = {wait:'<span class="badge b-wait">確認待ち</span>', fb:'<span class="badge b-fb">FB受信</span>', rev:'<span class="badge b-rev">修正中</span>', done:'<span class="badge b-done">完了</span>'};
+  var list = document.getElementById('cases-list');
+  list.innerHTML = cases.slice().reverse().map(function(c){
+    return '<div onclick="goCase(' + c.id + ')" style="background:#fff;border-radius:16px;border:0.5px solid ' + (c.status==='fb' ? '#F09595' : '#E8E8E8') + ';padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer;">'
+      + '<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+      + '<span style="color:#fff;font-size:13px;font-weight:700;">' + c.clientName.charAt(0) + '</span></div>'
+      + '<div style="flex:1;">'
+      + '<p style="font-size:14px;font-weight:600;margin-bottom:3px;">' + c.clientName + '</p>'
+      + '<p style="font-size:11px;color:#AAA;">' + c.month + '</p></div>'
+      + BADGE[c.status]
+      + '<span style="font-size:20px;color:#CCC;margin-left:4px;">›</span></div>';
+  }).join('');
+}
+
+// =====================
+// RENDER STEP 1
+// =====================
+function renderStep(n) {
+  var barEl = document.getElementById('step-bar-' + n);
+  if (barEl) renderStepBar(barEl, n);
+  if (n !== 1) return;
+  // Build photo slots
+  var postSlots = document.getElementById('post-slots');
+  postSlots.innerHTML = '';
+  for (var i=0;i<6;i++) { postSlots.appendChild(makeSlot(i)); }
+  var candSlots = document.getElementById('cand-slots');
+  candSlots.innerHTML = '';
+  for (var j=6;j<8;j++) { candSlots.appendChild(makeSlot(j)); }
+}
+
+function makeSlot(idx) {
+  var div = document.createElement('div');
+  div.className = 'upload-slot' + (newCase.photos[idx] ? ' filled' : '');
+  div.id = 'slot-' + idx;
+  var inp = document.createElement('input');
+  inp.type='file'; inp.accept='image/*'; inp.style.display='none'; inp.id='file-'+idx;
+  inp.onchange = (function(i){ return function(){ handleFile(i,this); }; })(idx);
+  div.appendChild(inp);
+  if (newCase.photos[idx]) {
+    var img = document.createElement('img');
+    img.src = newCase.photos[idx];
+    div.appendChild(img);
+    var chk = document.createElement('div');
+    chk.style.cssText='position:absolute;top:5px;right:5px;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#833AB4,#F77737);display:flex;align-items:center;justify-content:center;';
+    chk.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    div.appendChild(chk);
+  } else {
+    var label = idx < 6 ? '写真'+(idx+1) : '候補'+(idx-5);
+    div.innerHTML += '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#CCC" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+      + '<span class="slot-num">' + label + '</span>';
+  }
+  div.onclick = function(){ document.getElementById('file-'+idx).click(); };
+  return div;
+}
+
+function handleFile(idx, input) {
+  if (!input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    newCase.photos[idx] = e.target.result;
+    var slot = document.getElementById('slot-' + idx);
+    if (!slot) return;
+    slot.className = 'upload-slot filled';
+    slot.innerHTML = '';
+    var inp2 = document.createElement('input');
+    inp2.type='file'; inp2.accept='image/*'; inp2.style.display='none'; inp2.id='file-'+idx;
+    inp2.onchange = (function(i){ return function(){ handleFile(i,this); }; })(idx);
+    slot.appendChild(inp2);
+    var img = document.createElement('img');
+    img.src = e.target.result;
+    slot.appendChild(img);
+    var chk = document.createElement('div');
+    chk.style.cssText='position:absolute;top:5px;right:5px;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#833AB4,#F77737);display:flex;align-items:center;justify-content:center;';
+    chk.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    slot.appendChild(chk);
+    slot.onclick = function(){ document.getElementById('file-'+idx).click(); };
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function updateHashCount(val) {
+  var tags = val.match(/#\S+/g) || [];
+  document.getElementById('hash-count').textContent = tags.length;
+}
+
+// =====================
+// URL GENERATION
+// =====================
+function generateUrl() {
+  var clientName = document.getElementById('new-client-name') ? document.getElementById('new-client-name').value : '';
+  newCase.clientName = clientName;
+  newCase.caption    = document.getElementById('new-caption').value;
+  newCase.hashtags   = document.getElementById('new-hashtags').value;
+  newCase.postDate   = document.getElementById('new-postdate').value;
+  var rand = Math.random().toString(36).substr(2,8);
+  newCase.url = 'https://confirm.example.com/c/' + rand;
+  document.getElementById('url-display').value = newCase.url;
+  document.getElementById('url-section').style.display = 'block';
+  document.getElementById('generate-btn-wrap').style.display = 'none';
+}
+
+function copyUrl() {
+  var url = document.getElementById('url-display').value;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function(){
+      var btn = document.getElementById('copy-btn');
+      var orig = btn.textContent;
+      btn.textContent = '✓ コピー済み';
+      setTimeout(function(){ btn.textContent = orig; }, 2000);
+    });
+  } else {
+    document.getElementById('url-display').select();
+    document.execCommand('copy');
+  }
+}
+
+function shareLine() {
+  var url = document.getElementById('url-display').value;
+  var msg = encodeURIComponent('投稿内容の確認をお願いします。\n' + url);
+  window.open('https://line.me/R/msg/text/?' + msg, '_blank');
+}
+
+function finishNewCase() {
+  var nc = {
+    id: cases.length,
+    clientName: newCase.clientName || '新規クライアント様',
+    month: '2026年5月',
+    status: 'wait',
+    photos: newCase.photos.slice(),
+    caption: newCase.caption,
+    hashtags: newCase.hashtags,
+    postDate: newCase.postDate,
+    url: newCase.url,
+    feedbacks: []
+  };
+  cases.push(nc);
+  newCase = { clientName:'', photos:Array(8).fill(null), caption:'', hashtags:'', postDate:'', url:'' };
+  goDash();
+}
+
+// =====================
+// CASE DETAIL
+// =====================
+function renderCaseDetail(id) {
+  var c = cases.find(function(x){ return x.id===id; });
+  if (!c) return;
+  document.getElementById('detail-title').textContent = c.clientName + 'の案件';
+  var BADGE = {wait:'<span class="badge b-wait">確認待ち</span>', fb:'<span class="badge b-fb">フィードバック受信</span>', rev:'<span class="badge b-rev">修正対応中</span>', done:'<span class="badge b-done">投稿完了</span>'};
+  var html = '';
+  // Status card
+  html += '<div class="card" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">'
+    + '<div><p style="font-size:13px;font-weight:600;margin-bottom:4px;">' + c.clientName + '</p><p style="font-size:12px;color:#AAA;">' + c.month + '</p></div>'
+    + BADGE[c.status] + '</div>';
+  // Photos overview
+  html += '<p style="font-size:11px;color:#AAA;font-weight:700;letter-spacing:0.07em;margin-bottom:8px;">写真（6枚）</p>';
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px;">';
+  for (var i=0;i<6;i++) {
+    var pc = 'pc'+(i+1);
+    var fbBadge = '';
+    if (c.feedbacks.length) {
+      // NG if any reviewer flagged this photo
+      var anyNg = c.feedbacks.some(function(f){ return f.results[i].status==='ng'; });
+      fbBadge = '<span style="position:absolute;bottom:5px;left:5px;font-size:9px;padding:2px 6px;border-radius:8px;font-weight:700;background:' + (anyNg?'#FFEBEB':'#E6F9F0') + ';color:' + (anyNg?'#E24B4A':'#00A651') + ';">' + (anyNg?'NG':'OK') + '</span>';
+    }
+    var imgContent = c.photos[i]
+      ? '<img src="'+c.photos[i]+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">'
+      : '<div style="position:absolute;inset:0;'+PCSS[pc]+'"></div>';
+    html += '<div style="border-radius:12px;aspect-ratio:4/5;position:relative;overflow:hidden;border:0.5px solid #E8E8E8;">' + imgContent + fbBadge
+      + '<span style="position:absolute;top:5px;right:5px;background:rgba(0,0,0,0.4);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:8px;">'+(i+1)+'</span></div>';
+  }
+  html += '</div>';
+  // Caption
+  html += '<div class="card" style="margin-bottom:12px;">'
+    + '<p style="font-size:11px;color:#AAA;font-weight:700;letter-spacing:0.07em;margin-bottom:6px;">キャプション</p>'
+    + '<p style="font-size:13px;color:#555;line-height:1.7;">' + (c.caption || '未入力') + '</p>'
+    + '<p style="font-size:12px;color:#833AB4;margin-top:8px;">' + (c.hashtags || '') + '</p></div>';
+  // URL
+  html += '<div class="card" style="margin-bottom:12px;">'
+    + '<p style="font-size:11px;color:#AAA;font-weight:700;letter-spacing:0.07em;margin-bottom:8px;">確認URL</p>'
+    + '<div style="display:flex;gap:8px;">'
+    + '<input type="text" value="' + c.url + '" readonly style="font-size:11px;color:#555;background:#F5F5F5;flex:1;">'
+    + '<button onclick="alert(\'URLをコピーしました\')" style="flex-shrink:0;padding:9px 12px;border-radius:12px;border:none;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">コピー</button>'
+    + '</div></div>';
+  // Feedback button
+  if (c.feedbacks.length) {
+    var ngTotal = 0;
+    for (var k=0;k<6;k++) {
+      if (c.feedbacks.some(function(f){ return f.results[k].status==='ng'; })) ngTotal++;
+    }
+    var names = c.feedbacks.map(function(f){ return f.reviewerName + '様'; }).join('・');
+    var latest = c.feedbacks[c.feedbacks.length-1].submittedAt;
+    html += '<div style="background:#FFF5F5;border-radius:16px;border:0.5px solid #F09595;padding:14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+      + '<div><p style="font-size:13px;font-weight:600;color:#E24B4A;margin-bottom:2px;">フィードバック：' + c.feedbacks.length + '名から受信</p>'
+      + '<p style="font-size:11px;color:#AAA;">' + names + ' / NG：' + ngTotal + '枚 / 最終：' + latest + '</p></div>'
+      + '<button onclick="goFeedback()" style="flex-shrink:0;padding:9px 16px;border-radius:20px;border:none;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">確認する</button></div>';
+  }
+  document.getElementById('detail-content').innerHTML = html;
+}
+
+// =====================
+// FEEDBACK VIEW
+// =====================
+function renderFeedback(id) {
+  var c = cases.find(function(x){ return x.id===id; });
+  if (!c || !c.feedbacks.length) return;
+  var ngTotal = 0;
+  for (var k=0;k<6;k++) {
+    if (c.feedbacks.some(function(f){ return f.results[k].status==='ng'; })) ngTotal++;
+  }
+  var html = '';
+  // Banner
+  html += '<div style="background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);border-radius:16px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">'
+    + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+    + '<div><p style="font-size:13px;font-weight:600;color:#fff;margin-bottom:2px;">確認者 ' + c.feedbacks.length + '名 / NG ' + ngTotal + '枚' + (ngTotal ? ' — 修正が必要です' : '') + '</p>'
+    + '<p style="font-size:11px;color:rgba(255,255,255,0.75);">最終受信：' + c.feedbacks[c.feedbacks.length-1].submittedAt + '</p></div></div>';
+  // Per-reviewer sections
+  c.feedbacks.forEach(function(fb) {
+    var ngCount = fb.results.filter(function(r){ return r.status==='ng'; }).length;
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin:16px 2px 8px;">'
+      + '<p style="font-size:13px;font-weight:700;color:#555;">👤 ' + fb.reviewerName + '様</p>'
+      + '<p style="font-size:10px;color:#BBB;">' + fb.submittedAt + (ngCount ? ' / NG ' + ngCount + '枚' : ' / 全てOK') + '</p></div>';
+    fb.results.forEach(function(r, i) {
+      var isNg = r.status === 'ng';
+      var pc = 'pc'+(i+1);
+      var imgContent = c.photos[i]
+        ? '<img src="'+c.photos[i]+'" style="width:100%;height:100%;object-fit:cover;">'
+        : '<div style="'+PCSS[pc]+';width:100%;height:100%;"></div>';
+      html += '<div style="border:0.5px solid ' + (isNg?'#F09595':'#E8E8E8') + ';border-radius:16px;background:' + (isNg?'#FFF8F8':'#fff') + ';margin-bottom:10px;overflow:hidden;">'
+        + '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;">'
+        + '<div style="width:44px;height:55px;border-radius:8px;overflow:hidden;flex-shrink:0;">' + imgContent + '</div>'
+        + '<div style="flex:1;">'
+        + '<p style="font-size:12px;color:#AAA;margin-bottom:4px;">写真 ' + (i+1) + '</p>'
+        + '<span class="badge ' + (isNg?'b-ng':'b-ok') + '">' + (isNg?'NG':'OK') + '</span>'
+        + (r.hasDrawing ? '<span style="font-size:10px;color:#888;margin-left:6px;">✏ 書き込みあり</span>' : '')
+        + (r.replace !== null && r.replace !== undefined ? '<span style="font-size:10px;color:#888;margin-left:6px;">→ 候補'+(r.replace===0?'A':'B')+'に差し替え</span>' : '')
+        + '</div></div>';
+      if (r.comment) {
+        html += '<div style="padding:0 14px 12px;border-top:0.5px solid #FFE8E8;padding-top:10px;">'
+          + '<p style="font-size:12px;color:#888;line-height:1.7;">「' + r.comment + '」</p></div>';
+      }
+      html += '</div>';
+    });
+    if (fb.overallComment) {
+      html += '<div class="card" style="margin-bottom:16px;">'
+        + '<p style="font-size:11px;color:#AAA;font-weight:700;letter-spacing:0.07em;margin-bottom:6px;">全体コメント（' + fb.reviewerName + '様）</p>'
+        + '<p style="font-size:13px;color:#555;line-height:1.7;">「' + fb.overallComment + '」</p></div>';
+    }
+  });
+  html += '<button class="btn-g" onclick="alert(\'修正版アップロード画面へ（本番では実装）\')">修正版をアップロードして再依頼</button>';
+  document.getElementById('feedback-content').innerHTML = html;
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>投稿確認</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic UI',sans-serif; background:#F5F5F5; color:#1a1a1a; -webkit-font-smoothing:antialiased; }
+
+    .screen { display:none; min-height:100dvh; flex-direction:column; }
+    .screen.active { display:flex; }
+
+    .grad { background:linear-gradient(135deg,#833AB4 0%,#E1306C 50%,#F77737 100%); }
+
+    .header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:0.5px solid #E8E8E8; background:#fff; position:sticky; top:0; z-index:10; }
+    .header-back { font-size:28px; color:#999; line-height:1; padding:2px 8px 2px 0; cursor:pointer; }
+    .header-title { font-size:14px; font-weight:500; }
+
+    .btn-grad { width:100%; padding:16px; border-radius:28px; border:none; background:linear-gradient(135deg,#833AB4,#E1306C,#F77737); color:#fff; font-size:16px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .btn-outline { width:100%; padding:14px; border-radius:28px; border:1px solid #DDD; background:#fff; color:#888; font-size:14px; cursor:pointer; font-family:inherit; }
+
+    .badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:10px; font-weight:700; letter-spacing:0.04em; }
+    .b-ok   { background:#E6F9F0; color:#00A651; }
+    .b-ng   { background:#FFEBEB; color:#E24B4A; }
+
+    .prog-track { height:4px; background:#EEE; border-radius:2px; overflow:hidden; }
+    .prog-fill  { height:100%; background:linear-gradient(90deg,#833AB4,#E1306C,#F77737); border-radius:2px; transition:width 0.4s; }
+
+    .pc1{background:linear-gradient(135deg,#FF9A9E,#FAD0C4);}
+    .pc2{background:linear-gradient(135deg,#A1C4FD,#C2E9FB);}
+    .pc3{background:linear-gradient(135deg,#D4FC79,#96E6A1);}
+    .pc4{background:linear-gradient(135deg,#FDCB6E,#E17055);}
+    .pc5{background:linear-gradient(135deg,#B2FEFA,#0ED2F7);}
+    .pc6{background:linear-gradient(135deg,#F7971E,#FFD200);}
+    .pc7{background:linear-gradient(135deg,#E0C3FC,#8EC5FC);}
+    .pc8{background:linear-gradient(135deg,#FBC2EB,#A6C1EE);}
+
+    textarea { width:100%; border:0.5px solid #DDD; border-radius:12px; padding:10px 12px; font-size:15px; font-family:inherit; resize:none; background:#fff; color:#1a1a1a; line-height:1.7; }
+    textarea:focus { outline:none; border-color:#833AB4; }
+    label.lbl { display:block; font-size:11px; color:#AAA; font-weight:700; letter-spacing:0.08em; margin-bottom:6px; }
+
+    /* Photo card */
+    .photo-card { background:#fff; border-radius:18px; border:0.5px solid #E8E8E8; overflow:hidden; margin-bottom:12px; }
+    .photo-card.is-ok  { border-color:#96E6A1; }
+    .photo-card.is-ng  { border-color:#F09595; }
+
+    /* Draw overlay */
+    #draw-overlay { position:fixed; inset:0; background:#111; z-index:100; display:none; flex-direction:column; }
+    #draw-overlay.open { display:flex; }
+    #draw-area { flex:1; position:relative; overflow:hidden; }
+    #draw-bg   { position:absolute; inset:0; }
+    #draw-canvas { position:absolute; top:0; left:0; touch-action:none; cursor:crosshair; }
+
+    /* Candidate selector */
+    .cand-select { display:flex; gap:8px; padding:10px 12px 12px; background:#FFF8F8; border-top:0.5px solid #FFD6D6; }
+    .cand-thumb { flex:1; border-radius:12px; overflow:hidden; border:2px solid transparent; cursor:pointer; transition:border-color 0.15s; }
+    .cand-thumb.selected { border-color:#E1306C; }
+
+    .scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  </style>
+</head>
+<body>
+
+<!-- ===== WELCOME ===== -->
+<div id="s-welcome" class="screen active">
+  <div class="scroll" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;gap:22px;">
+    <div class="grad" style="width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="12" r="3.5"/><circle cx="17.5" cy="6.5" r="0.9" fill="#fff" stroke="none"/></svg>
+    </div>
+    <div style="text-align:center;">
+      <p style="font-size:11px;color:#BBB;letter-spacing:0.14em;margin-bottom:12px;">INSTAGRAM 投稿確認</p>
+      <h1 style="font-size:26px;font-weight:500;letter-spacing:-0.02em;line-height:1.35;">今月の投稿を<br>ご確認ください</h1>
+    </div>
+    <div style="background:#fff;border-radius:16px;border:0.5px solid #E8E8E8;padding:14px 16px;width:100%;">
+      <p style="font-size:13px;color:#666;line-height:1.9;">6枚の写真をご確認いただき、各写真にOKかNGかをお知らせください。気になる部分は写真に直接書き込んでお伝えいただけます。ご確認内容は、同じURLをお持ちのほかの確認者の方にも共有されます。</p>
+    </div>
+    <div style="background:#fff;border-radius:16px;border:0.5px solid #E8E8E8;padding:14px 16px;width:100%;">
+      <label class="lbl">お名前</label>
+      <input type="text" id="reviewer-name" placeholder="例：佐藤 花子" style="width:100%;border:0.5px solid #DDD;border-radius:12px;padding:10px 12px;font-size:15px;font-family:inherit;background:#fff;color:#1a1a1a;">
+      <p style="font-size:11px;color:#BBB;margin-top:8px;" id="welcome-reviewed"></p>
+    </div>
+    <button class="btn-grad" onclick="startReview()">確認をはじめる</button>
+    <p style="font-size:11px;color:#CCC;">有効期限：2026年5月22日まで</p>
+  </div>
+</div>
+
+<!-- ===== REVIEW (main screen) ===== -->
+<div id="s-review" class="screen">
+  <div class="header">
+    <div style="width:40px;"></div>
+    <span class="header-title">投稿内容を確認する</span>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="scroll" id="review-scroll" style="padding:14px 14px 36px;">
+
+    <!-- Previous reviewers -->
+    <div id="prev-reviewers"></div>
+
+    <!-- Progress -->
+    <div style="background:#fff;border-radius:14px;border:0.5px solid #E8E8E8;padding:12px 14px;margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:13px;color:#555;"><b id="cnt-done">0</b>枚 確認済み / 全6枚</span>
+        <span style="font-size:12px;color:#BBB;">残り<b id="cnt-left">6</b>枚</span>
+      </div>
+      <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%;"></div></div>
+    </div>
+
+    <!-- Photo cards -->
+    <div id="photo-cards"></div>
+
+    <!-- Caption section (shared / once) -->
+    <div style="background:#fff;border-radius:18px;border:0.5px solid #E8E8E8;padding:16px;margin-bottom:12px;">
+      <p style="font-size:12px;font-weight:700;color:#555;letter-spacing:0.05em;margin-bottom:14px;">📝 キャプション・ハッシュタグ</p>
+      <label class="lbl">キャプション</label>
+      <textarea id="shared-caption" rows="4" oninput="shared.caption=this.value;updateCapCount()"></textarea>
+      <p style="font-size:10px;color:#CCC;text-align:right;margin:3px 0 12px;"><span id="cap-count">0</span> / 2200文字</p>
+      <label class="lbl">ハッシュタグ</label>
+      <textarea id="shared-hashtags" rows="2" oninput="shared.hashtags=this.value" style="color:#833AB4;"></textarea>
+    </div>
+
+    <!-- Overall comment -->
+    <div style="background:#fff;border-radius:18px;border:0.5px solid #E8E8E8;padding:16px;margin-bottom:20px;">
+      <label class="lbl">全体へのコメント（任意）</label>
+      <textarea id="shared-comment" rows="2" oninput="shared.comment=this.value" placeholder="全体的なご意見があればご記入ください"></textarea>
+    </div>
+
+    <!-- Send -->
+    <button id="send-btn" class="btn-outline" onclick="goConfirm()" disabled style="opacity:0.4;cursor:not-allowed;">全て確認してから送信できます</button>
+
+  </div>
+</div>
+
+<!-- ===== DRAW OVERLAY ===== -->
+<div id="draw-overlay">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:0.5px solid #2A2A2A;flex-shrink:0;">
+    <button onclick="cancelDraw()" style="padding:8px 18px;border-radius:20px;border:0.5px solid #444;background:transparent;color:#AAA;font-size:13px;cursor:pointer;font-family:inherit;">キャンセル</button>
+    <span style="font-size:14px;font-weight:500;color:#fff;letter-spacing:0.02em;">書き込む</span>
+    <button onclick="saveDraw()" style="padding:8px 20px;border-radius:20px;border:none;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">完了</button>
+  </div>
+  <div id="draw-area">
+    <div id="draw-bg"></div>
+    <canvas id="draw-canvas"></canvas>
+  </div>
+  <div style="padding:14px 16px 20px;background:#111;border-top:0.5px solid #222;flex-shrink:0;">
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:12px;">
+      <button id="tool-circle" onclick="setTool('circle')" style="padding:9px 16px;border-radius:20px;border:none;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">⬤ 丸で囲む</button>
+      <button id="tool-line"   onclick="setTool('line')"   style="padding:9px 16px;border-radius:20px;border:0.5px solid #444;background:transparent;color:#888;font-size:12px;cursor:pointer;font-family:inherit;">✏ 線を引く</button>
+      <button onclick="undoDraw()" style="padding:9px 14px;border-radius:20px;border:0.5px solid #444;background:transparent;color:#888;font-size:12px;cursor:pointer;font-family:inherit;">↩ 消す</button>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:center;align-items:center;">
+      <span style="font-size:12px;color:#555;letter-spacing:0.06em;">色</span>
+      <div id="col-red" onclick="setColor('#E24B4A')" style="width:28px;height:28px;border-radius:50%;background:#E24B4A;border:3px solid #E24B4A;cursor:pointer;"></div>
+      <div id="col-wht" onclick="setColor('#FFFFFF')" style="width:28px;height:28px;border-radius:50%;background:#fff;border:1px solid #555;cursor:pointer;opacity:0.4;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CONFIRM ===== -->
+<div id="s-confirm" class="screen">
+  <div class="header">
+    <span class="header-back" onclick="goReview()">‹</span>
+    <span class="header-title">送信確認</span>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="scroll" style="padding:16px 16px 32px;">
+    <div style="margin-bottom:18px;">
+      <h1 style="font-size:18px;font-weight:500;letter-spacing:-0.01em;margin-bottom:4px;">この内容で送信しますか？</h1>
+      <p style="font-size:13px;color:#AAA;">送信後は変更できません</p>
+    </div>
+    <div id="confirm-list" style="margin-bottom:22px;"></div>
+    <button class="btn-grad" onclick="goSend()">送信する</button>
+    <div style="height:10px;"></div>
+    <button class="btn-outline" onclick="goReview()">戻って確認する</button>
+  </div>
+</div>
+
+<!-- ===== DONE ===== -->
+<div id="s-done" class="screen">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;gap:22px;text-align:center;">
+    <div class="grad" style="width:82px;height:82px;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <div>
+      <h1 style="font-size:26px;font-weight:500;letter-spacing:-0.02em;margin-bottom:12px;">ありがとうございます！</h1>
+      <p style="font-size:14px;color:#777;line-height:1.9;">確認内容を受け取りました。<br>修正が完了したら担当者から<br>ご連絡いたします。</p>
+    </div>
+    <div style="background:#fff;border-radius:16px;border:0.5px solid #E8E8E8;padding:14px 16px;width:100%;">
+      <p style="font-size:12px;color:#BBB;" id="send-time"></p>
+    </div>
+    <button class="btn-outline" onclick="goWelcome()">閉じる</button>
+  </div>
+</div>
+
+<script>
+// =====================
+// DATA
+// =====================
+var COLORS = ['pc1','pc2','pc3','pc4','pc5','pc6'];
+var CCOLORS = ['pc7','pc8'];
+var CAND_LABELS = ['候補 A','候補 B'];
+
+// 6 post photos
+var photos = Array.from({length:6}, function(_,i){
+  return { id:i, status:'none', drawing:null, replace:null }; // replace: null | 0 | 1
+});
+
+// Shared (one caption for the whole post)
+var shared = {
+  caption: '今日はおすすめの〇〇をご紹介します✨ ぜひチェックしてみてください！',
+  hashtags: '#〇〇 #△△ #おすすめ #日常',
+  comment: ''
+};
+
+// Feedback already submitted by other reviewers on the same URL
+// (demo data — in production this comes from Firestore)
+var prevFeedbacks = [
+  {
+    reviewer: '佐藤 花子',
+    submittedAt: '2026年6月8日 14:32',
+    results: [
+      {status:'ok', comment:'', replace:null},
+      {status:'ng', comment:'もう少し明るい写真にしてください', replace:0},
+      {status:'ok', comment:'', replace:null},
+      {status:'ok', comment:'', replace:null},
+      {status:'ok', comment:'', replace:null},
+      {status:'ok', comment:'', replace:null}
+    ],
+    comment: '全体的にはいい感じです！よろしくお願いします。'
+  }
+];
+var reviewerName = '';
+
+var currentDrawIdx = -1;
+
+// =====================
+// SCREENS
+// =====================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+function goWelcome() { renderWelcome(); showScreen('s-welcome'); }
+function goReview()  { renderReview(); showScreen('s-review'); }
+function goConfirm() { renderConfirm(); showScreen('s-confirm'); }
+function startReview() {
+  var name = document.getElementById('reviewer-name').value.trim();
+  if (!name) { alert('お名前を入力してください'); return; }
+  reviewerName = name;
+  goReview();
+}
+function goSend() {
+  var now = new Date();
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  var stamp = now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 ' + now.getHours() + ':' + pad(now.getMinutes());
+  // Record own feedback so other reviewers (and re-visits) can see it
+  prevFeedbacks.push({
+    reviewer: reviewerName,
+    submittedAt: stamp,
+    results: photos.map(function(p){ return {status:p.status, comment:'', replace:p.replace}; }),
+    comment: shared.comment
+  });
+  document.getElementById('send-time').textContent = '送信日時：' + stamp;
+  showScreen('s-done');
+}
+
+// =====================
+// RENDER REVIEW
+// =====================
+function renderWelcome() {
+  var el = document.getElementById('welcome-reviewed');
+  el.textContent = prevFeedbacks.length
+    ? prevFeedbacks.map(function(f){ return f.reviewer + '様'; }).join('・') + ' が確認済みです'
+    : 'まだどなたも確認していません';
+}
+
+function renderPrevReviewers() {
+  var wrap = document.getElementById('prev-reviewers');
+  if (!prevFeedbacks.length) { wrap.innerHTML = ''; return; }
+  var html = '<div style="background:#fff;border-radius:14px;border:0.5px solid #E8E8E8;padding:12px 14px;margin-bottom:14px;">'
+    + '<p style="font-size:12px;font-weight:700;color:#555;letter-spacing:0.05em;margin-bottom:4px;">👥 確認済みの方（' + prevFeedbacks.length + '名）</p>';
+  prevFeedbacks.forEach(function(f) {
+    var ok = f.results.filter(function(r){ return r.status === 'ok'; }).length;
+    var ng = f.results.length - ok;
+    html += '<div style="border-top:0.5px solid #F0F0F0;padding:9px 0 4px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">'
+      + '<span style="font-size:13px;font-weight:600;">' + f.reviewer + '様</span>'
+      + '<span style="font-size:10px;color:#BBB;">' + f.submittedAt + '</span></div>'
+      + '<div style="display:flex;gap:6px;align-items:center;">'
+      + '<span class="badge b-ok">OK ' + ok + '枚</span>'
+      + (ng ? '<span class="badge b-ng">NG ' + ng + '枚</span>' : '')
+      + '</div>'
+      + (f.comment ? '<p style="font-size:12px;color:#888;margin-top:6px;line-height:1.6;">「' + f.comment + '」</p>' : '')
+      + '</div>';
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+function renderReview() {
+  // Previous reviewers
+  renderPrevReviewers();
+
+  // Progress
+  var done = photos.filter(function(p){ return p.status !== 'none'; }).length;
+  document.getElementById('cnt-done').textContent = done;
+  document.getElementById('cnt-left').textContent = photos.length - done;
+  document.getElementById('prog-fill').style.width = Math.round(done / photos.length * 100) + '%';
+
+  // Shared fields
+  document.getElementById('shared-caption').value  = shared.caption;
+  document.getElementById('shared-hashtags').value = shared.hashtags;
+  document.getElementById('shared-comment').value  = shared.comment;
+  updateCapCount();
+
+  // Photo cards
+  var container = document.getElementById('photo-cards');
+  container.innerHTML = '';
+  photos.forEach(function(p, i) {
+    container.appendChild(makePhotoCard(p, i));
+  });
+
+  // Send button
+  var allDone = photos.every(function(p){ return p.status !== 'none'; });
+  var btn = document.getElementById('send-btn');
+  btn.disabled    = !allDone;
+  btn.className   = allDone ? 'btn-grad' : 'btn-outline';
+  btn.style.opacity = allDone ? '1' : '0.4';
+  btn.style.cursor  = allDone ? 'pointer' : 'not-allowed';
+  btn.textContent   = allDone ? 'フィードバックを送信する' : '全て確認してから送信できます';
+}
+
+function updateCapCount() {
+  document.getElementById('cap-count').textContent = shared.caption.length;
+}
+
+function makePhotoCard(p, i) {
+  var wrap = document.createElement('div');
+  wrap.className = 'photo-card' + (p.status==='ok' ? ' is-ok' : p.status==='ng' ? ' is-ng' : '');
+  wrap.id = 'card-' + i;
+  wrap.style.marginBottom = '12px';
+
+  // ---- Photo area ----
+  var photoDiv = document.createElement('div');
+  photoDiv.style.cssText = 'position:relative; width:100%; aspect-ratio:4/5; cursor:pointer; overflow:hidden;';
+  photoDiv.onclick = function(){ openDraw(i); };
+
+  var bg = document.createElement('div');
+  bg.className = COLORS[i];
+  bg.style.cssText = 'position:absolute; inset:0;';
+  photoDiv.appendChild(bg);
+
+  // Drawing preview canvas
+  var prev = document.createElement('canvas');
+  prev.id = 'prev-' + i;
+  prev.style.cssText = 'position:absolute; inset:0; pointer-events:none;';
+  photoDiv.appendChild(prev);
+  if (p.drawing) {
+    var img = new Image();
+    img.onload = function() {
+      prev.width  = prev.offsetWidth  || 300;
+      prev.height = prev.offsetHeight || 200;
+      prev.getContext('2d').drawImage(img, 0, 0, prev.width, prev.height);
+    };
+    img.src = p.drawing;
+    setTimeout(function(){ if(img.complete){ img.onload(); } }, 100);
+  }
+
+  // Draw button overlay
+  var drawBtn = document.createElement('button');
+  drawBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> 書き込む';
+  drawBtn.style.cssText = 'position:absolute;bottom:10px;right:10px;padding:7px 14px;border-radius:20px;border:none;background:rgba(0,0,0,0.6);color:#fff;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;';
+  drawBtn.onclick = function(e){ e.stopPropagation(); openDraw(i); };
+  photoDiv.appendChild(drawBtn);
+
+  // Drawing badge
+  if (p.drawing) {
+    var badge = document.createElement('span');
+    badge.style.cssText = 'position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.55);color:#fff;font-size:10px;padding:3px 10px;border-radius:10px;font-weight:500;';
+    badge.textContent = '✏ 書き込みあり';
+    photoDiv.appendChild(badge);
+  }
+
+  // Photo label
+  var label = document.createElement('div');
+  label.style.cssText = 'position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.45);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:10px;';
+  label.textContent = (i + 1) + ' / ' + photos.length;
+  photoDiv.appendChild(label);
+
+  wrap.appendChild(photoDiv);
+
+  // ---- OK / NG buttons ----
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 12px 10px;';
+
+  var G = 'linear-gradient(135deg,#833AB4,#E1306C,#F77737)';
+
+  var okBtn = document.createElement('button');
+  okBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> OK';
+  okBtn.id = 'ok-' + i;
+  okBtn.style.cssText = 'padding:13px;border-radius:28px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;transition:all 0.15s;' +
+    (p.status==='ok' ? 'background:'+G+';border:none;color:#fff;' : 'background:#fff;border:1.5px solid #DDD;color:#BBB;');
+  okBtn.onclick = (function(idx){ return function(){ setStatus(idx,'ok'); }; })(i);
+
+  var ngBtn = document.createElement('button');
+  ngBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg> NG';
+  ngBtn.id = 'ng-' + i;
+  ngBtn.style.cssText = 'padding:13px;border-radius:28px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px;transition:all 0.15s;' +
+    (p.status==='ng' ? 'background:#E24B4A;border:none;color:#fff;' : 'background:#fff;border:1.5px solid #DDD;color:#BBB;');
+  ngBtn.onclick = (function(idx){ return function(){ setStatus(idx,'ng'); }; })(i);
+
+  btnRow.appendChild(okBtn);
+  btnRow.appendChild(ngBtn);
+  wrap.appendChild(btnRow);
+
+  // ---- Other reviewers' feedback for this photo ----
+  var others = prevFeedbacks.filter(function(f){
+    var r = f.results[i];
+    return r && (r.status === 'ng' || r.comment);
+  });
+  if (others.length) {
+    var oWrap = document.createElement('div');
+    oWrap.style.cssText = 'padding:10px 12px 12px;background:#FAFAFA;border-top:0.5px solid #EEE;';
+    oWrap.innerHTML = '<p style="font-size:10px;color:#BBB;font-weight:700;letter-spacing:0.06em;margin-bottom:6px;">ほかの確認者のフィードバック</p>'
+      + others.map(function(f){
+        var r = f.results[i];
+        return '<p style="font-size:11px;color:#888;line-height:1.9;">'
+          + '<b style="color:#555;">' + f.reviewer + '様：</b>'
+          + '<span class="badge ' + (r.status === 'ng' ? 'b-ng' : 'b-ok') + '">' + r.status.toUpperCase() + '</span>'
+          + (r.replace === 0 || r.replace === 1 ? ' 候補' + (r.replace === 0 ? 'A' : 'B') + 'に差し替え' : '')
+          + (r.comment ? ' 「' + r.comment + '」' : '')
+          + '</p>';
+      }).join('');
+    wrap.appendChild(oWrap);
+  }
+
+  // ---- Candidate selector (only if NG) ----
+  if (p.status === 'ng') {
+    var candWrap = document.createElement('div');
+    candWrap.id = 'cand-wrap-' + i;
+    candWrap.className = 'cand-select';
+    candWrap.style.flexDirection = 'column';
+
+    var candLabel = document.createElement('p');
+    candLabel.style.cssText = 'font-size:12px;color:#E24B4A;font-weight:600;margin-bottom:8px;';
+    candLabel.textContent = '差し替え候補はありますか？';
+    candWrap.appendChild(candLabel);
+
+    var candRow = document.createElement('div');
+    candRow.style.cssText = 'display:flex;gap:8px;';
+
+    [0, 1].forEach(function(ci) {
+      var ct = document.createElement('div');
+      ct.className = 'cand-thumb' + (p.replace === ci ? ' selected' : '');
+      ct.id = 'cand-' + i + '-' + ci;
+
+      var ctImg = document.createElement('div');
+      ctImg.className = CCOLORS[ci];
+      ctImg.style.cssText = 'height:70px;display:flex;align-items:center;justify-content:center;';
+      ctImg.innerHTML = '<span style="font-size:11px;font-weight:700;color:rgba(0,0,0,0.4);">' + CAND_LABELS[ci] + '</span>';
+
+      var ctLbl = document.createElement('div');
+      ctLbl.style.cssText = 'padding:5px 8px;font-size:11px;font-weight:500;text-align:center;' +
+        (p.replace === ci ? 'background:#E1306C;color:#fff;' : 'background:#fff;color:#888;');
+      ctLbl.textContent = p.replace === ci ? '✓ この候補に差し替え' : CAND_LABELS[ci] + 'に差し替え';
+
+      ct.appendChild(ctImg);
+      ct.appendChild(ctLbl);
+      ct.onclick = (function(photoIdx, candIdx){ return function(){ setReplace(photoIdx, candIdx); }; })(i, ci);
+      candRow.appendChild(ct);
+    });
+
+    // "差し替えなし" option
+    var noReplace = document.createElement('button');
+    var noSelected = p.replace === -1;
+    noReplace.style.cssText = 'margin-top:8px;width:100%;padding:9px;border-radius:12px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:' + (noSelected ? '600' : '400') + ';' +
+      (noSelected
+        ? 'border:1.5px solid #833AB4;background:#F5F0FF;color:#833AB4;'
+        : 'border:0.5px solid #DDD;background:transparent;color:#BBB;');
+    noReplace.textContent = noSelected ? '✓ 差し替えなし（修正のみ依頼）' : '差し替えなし（修正のみ依頼）';
+    noReplace.onclick = (function(idx){ return function(){ setReplace(idx, -1); }; })(i);
+
+    candWrap.appendChild(candRow);
+    candWrap.appendChild(noReplace);
+    wrap.appendChild(candWrap);
+  }
+
+  return wrap;
+}
+
+// =====================
+// STATUS
+// =====================
+function setStatus(idx, status) {
+  photos[idx].status = status;
+  if (status === 'ok') photos[idx].replace = null; // clear replace if switching to OK
+
+  // Re-render just this card + progress
+  var container = document.getElementById('photo-cards');
+  var oldCard = document.getElementById('card-' + idx);
+  var newCard = makePhotoCard(photos[idx], idx);
+  container.replaceChild(newCard, oldCard);
+
+  // Restore drawing if exists
+  if (photos[idx].drawing) {
+    var prev = document.getElementById('prev-' + idx);
+    var img = new Image();
+    img.onload = function(){
+      prev.width  = prev.offsetWidth  || 300;
+      prev.height = prev.offsetHeight || 200;
+      prev.getContext('2d').drawImage(img, 0, 0, prev.width, prev.height);
+    };
+    img.src = photos[idx].drawing;
+  }
+
+  updateProgress();
+  updateSendBtn();
+}
+
+function setReplace(photoIdx, candIdx) {
+  photos[photoIdx].replace = candIdx;
+  // Re-render candidate selector
+  var container = document.getElementById('photo-cards');
+  var oldCard = document.getElementById('card-' + photoIdx);
+  var newCard = makePhotoCard(photos[photoIdx], photoIdx);
+  container.replaceChild(newCard, oldCard);
+  if (photos[photoIdx].drawing) {
+    var prev = document.getElementById('prev-' + photoIdx);
+    var img = new Image();
+    img.onload = function(){
+      prev.width  = prev.offsetWidth  || 300;
+      prev.height = prev.offsetHeight || 200;
+      prev.getContext('2d').drawImage(img, 0, 0, prev.width, prev.height);
+    };
+    img.src = photos[photoIdx].drawing;
+  }
+}
+
+function updateProgress() {
+  var done = photos.filter(function(p){ return p.status !== 'none'; }).length;
+  document.getElementById('cnt-done').textContent = done;
+  document.getElementById('cnt-left').textContent = photos.length - done;
+  document.getElementById('prog-fill').style.width = Math.round(done / photos.length * 100) + '%';
+}
+
+function updateSendBtn() {
+  var allDone = photos.every(function(p){ return p.status !== 'none'; });
+  var btn = document.getElementById('send-btn');
+  if (!btn) return;
+  btn.disabled    = !allDone;
+  btn.className   = allDone ? 'btn-grad' : 'btn-outline';
+  btn.style.opacity = allDone ? '1' : '0.4';
+  btn.style.cursor  = allDone ? 'pointer' : 'not-allowed';
+  btn.textContent   = allDone ? 'フィードバックを送信する' : '全て確認してから送信できます';
+}
+
+// =====================
+// CONFIRM
+// =====================
+function renderConfirm() {
+  var html = '';
+  photos.forEach(function(p, i) {
+    var isBad = p.status === 'ng';
+    var badgeHtml = p.status==='ok'
+      ? '<span class="badge b-ok">OK</span>'
+      : '<span class="badge b-ng">NG</span>';
+    var extras = [];
+    if (p.drawing) extras.push('書き込みあり');
+    if (p.replace === -1) extras.push('差し替えなし');
+    else if (p.replace === 0 || p.replace === 1) extras.push(CAND_LABELS[p.replace] + 'に差し替え');
+    html +=
+      '<div style="border:0.5px solid ' + (isBad ? '#F09595':'#E8E8E8') + ';border-radius:14px;padding:12px 14px;background:' + (isBad ? '#FFF5F5':'#fff') + ';margin-bottom:8px;display:flex;align-items:center;gap:12px;">' +
+      '<div class="' + COLORS[i] + '" style="width:42px;height:42px;border-radius:10px;flex-shrink:0;"></div>' +
+      '<div style="flex:1;">' +
+      '<p style="font-size:11px;color:#AAA;margin-bottom:4px;">写真 ' + (i+1) + '</p>' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' + badgeHtml +
+      extras.map(function(e){ return '<span style="font-size:10px;color:#888;">' + e + '</span>'; }).join('') +
+      '</div></div></div>';
+  });
+  // Shared caption summary
+  html += '<div style="border:0.5px solid #E8E8E8;border-radius:14px;padding:12px 14px;background:#fff;margin-bottom:8px;">' +
+    '<p style="font-size:11px;color:#AAA;margin-bottom:4px;">キャプション</p>' +
+    '<p style="font-size:12px;color:#555;line-height:1.6;">' + (shared.caption || '（未入力）') + '</p></div>';
+  if (shared.comment) {
+    html += '<div style="border:0.5px solid #E8E8E8;border-radius:14px;padding:12px 14px;background:#fff;margin-bottom:8px;">' +
+      '<p style="font-size:11px;color:#AAA;margin-bottom:4px;">全体コメント</p>' +
+      '<p style="font-size:12px;color:#555;">「' + shared.comment + '」</p></div>';
+  }
+  document.getElementById('confirm-list').innerHTML = html;
+}
+
+// =====================
+// DRAWING
+// =====================
+var dCtx, dCanvas, dTool='circle', dColor='#E24B4A';
+var dOn=false, dSX=0, dSY=0, dSnap=null, dHist=[];
+
+function openDraw(idx) {
+  currentDrawIdx = idx;
+  var overlay = document.getElementById('draw-overlay');
+  overlay.classList.add('open');
+  requestAnimationFrame(function() {
+    var area = document.getElementById('draw-area');
+    var rect = area.getBoundingClientRect();
+    var dpr  = window.devicePixelRatio || 1;
+    var bg   = document.getElementById('draw-bg');
+    bg.className = COLORS[idx];
+    bg.style.cssText = 'position:absolute;inset:0;';
+    dCanvas = document.getElementById('draw-canvas');
+    dCanvas.width  = rect.width  * dpr;
+    dCanvas.height = rect.height * dpr;
+    dCanvas.style.width  = rect.width  + 'px';
+    dCanvas.style.height = rect.height + 'px';
+    dCtx = dCanvas.getContext('2d');
+    dCtx.scale(dpr, dpr);
+    dHist = [];
+    if (photos[idx].drawing) {
+      var img = new Image();
+      img.onload = function(){
+        dCtx.drawImage(img, 0, 0, rect.width, rect.height);
+        dHist.push(dCtx.getImageData(0,0,dCanvas.width,dCanvas.height));
+      };
+      img.src = photos[idx].drawing;
+    }
+    dCanvas.addEventListener('touchstart', dTS, {passive:false});
+    dCanvas.addEventListener('touchmove',  dTM, {passive:false});
+    dCanvas.addEventListener('touchend',   dTE, {passive:false});
+    dCanvas.addEventListener('mousedown',  dMD);
+    dCanvas.addEventListener('mousemove',  dMV);
+    dCanvas.addEventListener('mouseup',    dMU);
+  });
+}
+function closeDraw() {
+  document.getElementById('draw-overlay').classList.remove('open');
+  if (!dCanvas) return;
+  dCanvas.removeEventListener('touchstart',dTS);
+  dCanvas.removeEventListener('touchmove', dTM);
+  dCanvas.removeEventListener('touchend',  dTE);
+  dCanvas.removeEventListener('mousedown', dMD);
+  dCanvas.removeEventListener('mousemove', dMV);
+  dCanvas.removeEventListener('mouseup',   dMU);
+}
+function cancelDraw() { closeDraw(); }
+function saveDraw() {
+  photos[currentDrawIdx].drawing = dCanvas.toDataURL('image/png');
+  closeDraw();
+  // Refresh that card
+  var container = document.getElementById('photo-cards');
+  var oldCard   = document.getElementById('card-' + currentDrawIdx);
+  var newCard   = makePhotoCard(photos[currentDrawIdx], currentDrawIdx);
+  container.replaceChild(newCard, oldCard);
+  setTimeout(function(){
+    var prev = document.getElementById('prev-' + currentDrawIdx);
+    if (!prev || !photos[currentDrawIdx].drawing) return;
+    var img = new Image();
+    img.onload = function(){
+      prev.width  = prev.offsetWidth  || 300;
+      prev.height = prev.offsetHeight || 200;
+      prev.getContext('2d').drawImage(img, 0, 0, prev.width, prev.height);
+    };
+    img.src = photos[currentDrawIdx].drawing;
+  }, 80);
+}
+function getXY(e){
+  var r=dCanvas.getBoundingClientRect();
+  if(e.touches) return {x:e.touches[0].clientX-r.left, y:e.touches[0].clientY-r.top};
+  return {x:e.clientX-r.left, y:e.clientY-r.top};
+}
+function dTS(e){e.preventDefault();dB(getXY(e));}
+function dTM(e){e.preventDefault();dM(getXY(e));}
+function dTE(e){e.preventDefault();dE();}
+function dMD(e){dB(getXY(e));}
+function dMV(e){if(dOn)dM(getXY(e));}
+function dMU(){dE();}
+function dB(p){
+  dOn=true; dSX=p.x; dSY=p.y;
+  dSnap=dCtx.getImageData(0,0,dCanvas.width,dCanvas.height);
+  if(dTool==='line'){dCtx.beginPath();dCtx.moveTo(p.x,p.y);}
+}
+function dM(p){
+  if(!dOn)return;
+  if(dTool==='circle'){
+    dCtx.putImageData(dSnap,0,0);
+    var dx=p.x-dSX, dy=p.y-dSY;
+    dCtx.beginPath();
+    dCtx.ellipse(dSX+dx/2,dSY+dy/2,Math.max(1,Math.abs(dx/2)),Math.max(1,Math.abs(dy/2)),0,0,Math.PI*2);
+    dCtx.strokeStyle=dColor; dCtx.lineWidth=3; dCtx.stroke();
+  } else {
+    dCtx.lineTo(p.x,p.y);
+    dCtx.strokeStyle=dColor; dCtx.lineWidth=3; dCtx.lineCap='round'; dCtx.lineJoin='round'; dCtx.stroke();
+  }
+}
+function dE(){
+  if(!dOn)return; dOn=false;
+  dHist.push(dCtx.getImageData(0,0,dCanvas.width,dCanvas.height));
+}
+function undoDraw(){
+  if(dHist.length>0)dHist.pop();
+  if(dHist.length>0)dCtx.putImageData(dHist[dHist.length-1],0,0);
+  else dCtx.clearRect(0,0,dCanvas.width,dCanvas.height);
+}
+function setTool(t){
+  dTool=t;
+  var G='linear-gradient(135deg,#833AB4,#E1306C,#F77737)';
+  var cb=document.getElementById('tool-circle'), lb=document.getElementById('tool-line');
+  if(t==='circle'){
+    cb.style.background=G; cb.style.border='none'; cb.style.color='#fff'; cb.style.fontWeight='600';
+    lb.style.background='transparent'; lb.style.border='0.5px solid #444'; lb.style.color='#888'; lb.style.fontWeight='400';
+  } else {
+    lb.style.background=G; lb.style.border='none'; lb.style.color='#fff'; lb.style.fontWeight='600';
+    cb.style.background='transparent'; cb.style.border='0.5px solid #444'; cb.style.color='#888'; cb.style.fontWeight='400';
+  }
+}
+function setColor(c){
+  dColor=c;
+  document.getElementById('col-red').style.opacity = c==='#E24B4A'?'1':'0.35';
+  document.getElementById('col-wht').style.opacity = c==='#FFFFFF'?'1':'0.35';
+  document.getElementById('col-red').style.border  = c==='#E24B4A'?'3px solid #E24B4A':'1px solid #555';
+  document.getElementById('col-wht').style.border  = c==='#FFFFFF'?'3px solid #CCC':'1px solid #555';
+}
+
+// =====================
+// INIT
+// =====================
+renderWelcome();
+</script>
+</body>
+</html>

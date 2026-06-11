@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 管理者は特定アカウントのみ（auth != null だけだと任意のGoogleアカウントが管理者になれてしまう）
+    // UIDは推測不能な不透明IDのため、リポジトリ公開時もメールアドレスのような個人情報露出にならない
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid == 'UMQBgF0qSogFaabzjHUuslmyuQ53';
+    }
+
+    // クライアントがフィードバック送信時に更新できるフィールドのみ許可
+    function isClientProjectFeedbackUpdate() {
+      let allowed = ['status', 'currentRound', 'approvedCount', 'rejectedCount',
+                     'lastFeedbackAt', 'allApprovedAt', 'updatedAt',
+                     'reviewerCount', 'ngPhotoIds'];
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    function isClientPhotoStatusUpdate() {
+      let allowed = ['currentStatus', 'latestRound', 'updatedAt'];
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    // clients: 業者のみ読み書き可
+    match /clients/{clientId} {
+      allow read, write: if isAdmin();
+    }
+
+    // confirmLinks: 確認URLトークン → projectId のルックアップ
+    // トークンを知っている人だけが get で引ける。list は不可（トークン列挙を防ぐ）
+    match /confirmLinks/{token} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if isAdmin();
+    }
+
+    // projects: クライアントは確認URLのトークンから confirmLinks 経由で projectId を得て
+    // get で読む。list を全開放すると未認証で全案件を列挙できてしまうため管理者のみ。
+    match /projects/{projectId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || isClientProjectFeedbackUpdate();
+
+      // photos: クライアントは読み取りとステータス更新のみ可
+      match /photos/{photoId} {
+        allow read: if true;
+        allow create, delete: if isAdmin();
+        allow update: if isAdmin() || isClientPhotoStatusUpdate();
+      }
+
+      // feedbackRounds: クライアントも読み取り可（確認URLで他の確認者の状況を表示するため）・新規作成可（送信）
+      match /feedbackRounds/{roundId} {
+        allow read: if true;
+        allow create: if true;
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // systemConfig: 管理者のみ読み書き可
+    match /systemConfig/{docId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

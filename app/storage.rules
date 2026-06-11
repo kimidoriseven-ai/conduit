@@ -1,0 +1,31 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // 業者ログイン判定（特定アカウントのみ・UID判定）
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid == 'UMQBgF0qSogFaabzjHUuslmyuQ53';
+    }
+
+    // 写真アップロード: 業者のみ
+    match /projects/{projectId}/photos/{fileName} {
+      allow read: if true;            // 確認ページで写真を表示するために必要
+      allow write: if isAdmin();
+    }
+
+    // 手書き書き込み: アップロードは認証不要（クライアントが送信）、読み取りは誰でも可
+    // サイズ・形式を制限して任意ファイル置き場としての悪用を防ぐ
+    match /projects/{projectId}/drawings/{fileName} {
+      allow read: if true;
+      allow write: if request.resource.size < 5 * 1024 * 1024
+                && request.resource.contentType == 'image/png';
+    }
+
+    // サムネイル: 読み取りは誰でも可、書き込みはCloud Functionsのみ
+    match /projects/{projectId}/thumbnails/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
