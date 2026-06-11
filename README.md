@@ -6,10 +6,11 @@ Instagram投稿代行サービスのための、投稿確認・承認・自動�
 
 投稿予定の写真をクライアントがスマホで確認し、OK/NG・手書き書き込み・差し替え指示をワンタップでフィードバック。全員の承認が揃ったら、設定日時にInstagramへ自動でカルーセル投稿します。
 
-## 本番URL
+## 本番URL・ライブデモ
 
 - **カスタムドメイン**: https://conduit-app.com
 - **Firebase Hosting**: https://instagram-post-confirm.web.app
+- **🎯 ライブデモ**: https://conduit-app.com/confirm/demo — クライアント確認画面をダミーデータで体験できます（送信しても何も保存されません）
 
 ## 特徴
 

@@ -8,6 +8,7 @@ import {
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase/config';
 import usePageTitle from '../hooks/usePageTitle';
+import { DEMO_TOKEN, demoProject, demoMainPhotos, demoAltPhotos, demoPrevRounds } from '../utils/demoData';
 
 const GRAD = 'linear-gradient(135deg, #833AB4 0%, #E1306C 50%, #F77737 100%)';
 const CANVAS_W = 800;
@@ -124,6 +125,20 @@ export default function ConfirmPage() {
 
   useEffect(() => {
     async function load() {
+      // デモモード: Firestoreに触れずモックデータで全画面を体験できる
+      if (token === DEMO_TOKEN) {
+        setProject(demoProject);
+        setCaptionEdit(demoProject.caption);
+        setHashtagEdit(demoProject.hashtags);
+        setMainPhotos(demoMainPhotos);
+        setAltPhotos(demoAltPhotos);
+        setPrevRounds(demoPrevRounds);
+        const init = {};
+        demoMainPhotos.forEach(p => { init[p.id] = { status:'pending', comment:'', drawingDataUrl:null, replaceWithPhotoId:null }; });
+        setFeedbacks(init);
+        setLoading(false);
+        return;
+      }
       try {
         // confirmLinks/{token} で projectId を引く（projects の list はルールで禁止）
         const linkSnap = await getDoc(doc(db, 'confirmLinks', token));
@@ -165,6 +180,8 @@ export default function ConfirmPage() {
   const allJudged = mainPhotos.length > 0 && mainPhotos.every(p => feedbacks[p.id]?.status !== 'pending');
 
   async function handleSubmit() {
+    // デモモードでは何も保存せず完了画面へ
+    if (token === DEMO_TOKEN) { navigate(`/confirm/${token}/complete`); return; }
     setSubmitting(true);
     try {
       const round = project.currentRound || 1;
