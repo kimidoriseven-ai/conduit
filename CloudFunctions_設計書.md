@@ -1,8 +1,9 @@
 # Cloud Functions 処理フロー設計書
 ## Instagram投稿確認WEBアプリ
 
-**バージョン：** 1.0  
-**作成日：** 2026-05-16
+**バージョン：** 1.1  
+**作成日：** 2026-05-16  
+**最終更新：** 2026-06-13（Instagram OAuth連携の新規2関数追加、`executeInstagramPost` / `refreshAccessTokens` / `testInstagramPost` の変更点反映）
 
 ---
 
@@ -16,6 +17,8 @@
 | `postToInstagram` | Cloud Scheduler | 指定日時に Instagram へ投稿 |
 | `refreshAccessTokens` | Cloud Scheduler（毎日） | 期限切れ前のトークンを自動更新 |
 | `notifyLineOnFeedback` | Firestore トリガー | フィードバック受信時にLINE通知 |
+| `createInstagramConnectLink` | Callable（管理者のみ） | OAuthワンタイムstate発行・認可URLを返す（2026-06-13追加） |
+| `completeInstagramOAuth` | Callable（認証不要・stateで担保） | state検証・code→トークン交換・`instagramAccounts` に保存（2026-06-13追加） |
 
 ---
 
@@ -132,15 +135,18 @@ confirmToken を検証して写真・キャプションデータを返す。
 ```
 ① ペイロード: { projectId, photoId } を受け取る
 ② Firestore から Photo・Project・Client を取得
-③ Client.accessToken の有効期限を確認
-   └── 期限切れ → Instagram投稿失敗として処理、LINE通知してスキップ
-④ Instagram Graph API でメディアオブジェクト作成：
-   POST /v18.0/{instagramBusinessAccountId}/media
-   { image_url, caption, published: false }
+③ 認証情報の解決（優先順位順）：
+   1. 案件の `instagramAccountId` に対応する `instagramAccounts/{igUserId}` を取得
+   2. なければ `instagramAccounts` が1件のみの場合はそれを使用
+   3. なければ旧 `systemConfig/instagram`（後方互換）
+   └── いずれも取得できない / 期限切れ → Instagram投稿失敗として処理、LINE通知してスキップ
+④ Instagram API でメディアオブジェクト作成（2026-06-13変更）：
+   POST https://graph.instagram.com/v21.0/me/media
+   パラメータ形式: application/x-www-form-urlencoded（JSONボディ＋アカウントID指定は OAuthException code 2 の原因）
    → container_id を取得
 ⑤ メディアコンテナ公開：
-   POST /v18.0/{instagramBusinessAccountId}/media_publish
-   { creation_id: container_id }
+   POST https://graph.instagram.com/v21.0/me/media_publish
+   パラメータ形式: application/x-www-form-urlencoded
    → instagram_media_id を取得
 ⑥ 成功時：
    └── photos の instagramStatus = 'posted'
@@ -162,21 +168,17 @@ Instagram のアクセストークンが期限切れになる前に自動更新�
 
 **スケジュール：** 毎日 AM 9:00（JST）
 
-**処理フロー：**
+**処理フロー（2026-06-13更新）：**
 ```
-① clients コレクション全件を取得
-② 各クライアントの tokenExpiresAt を確認
-③ 有効期限まで 5日以内 → トークン更新処理
+① 旧 systemConfig/instagram ドキュメントを取得（存在すれば更新対象に含める）
+② instagramAccounts コレクション全件を取得
+③ ①＋②を合わせた全トークンの有効期限を確認
+④ 有効期限まで 5日以内 → トークン更新処理
    ├── GET /oauth/access_token?grant_type=ig_refresh_token&access_token={token}
-   └── 成功時：
-       ├── client.accessToken を新トークンで更新
-       ├── client.tokenExpiresAt を +60日で更新
-       ├── client.tokenRefreshedAt = now
-       ├── client.tokenStatus = 'valid'
-       └── LINE通知：「〇〇様のInstagramトークンを自動更新しました。」
-④ 更新失敗 or 既に期限切れ：
-   ├── client.tokenStatus = 'expired'
-   └── LINE通知：「⚠️ 〇〇様のInstagram連携が切れています。管理画面から再認証をお願いします。」
+   └── 成功時：Firestore の accessToken / tokenExpiresAt / tokenRefreshedAt を更新
+⑤ 更新失敗 or 既に期限切れ：
+   └── LINE通知：「⚠️ @{username} のInstagram連携が切れています。再連携をお願いします。」
+       （instagramAccounts の場合はユーザー名つきで通知）
 ```
 
 ---
@@ -197,6 +199,52 @@ Instagram のアクセストークンが期限切れになる前に自動更新�
    「〇〇様からフィードバックが届きました。
     NG：{rejectedCount}枚 / 全{totalMainPhotos}枚
     管理画面をご確認ください。」
+```
+
+---
+
+### 2.7 `createInstagramConnectLink` — Callable（2026-06-13追加）
+
+管理者が管理画面からInstagram連携リンクを発行する。管理者認証必須。
+
+**処理フロー：**
+```
+① 管理者認証チェック（未認証 / 管理者以外はエラー）
+② crypto.randomUUID() でワンタイムstate生成
+③ Firestore: oauthStates/{state} に { createdAt, expiresAt: +30分, used: false } を保存
+④ Instagram OAuth認可URL を組み立てて返す：
+   https://www.instagram.com/oauth/authorize?
+     client_id={INSTAGRAM_APP_ID}
+     &redirect_uri=https://conduit-app.com/instagram/callback
+     &scope=instagram_business_basic,instagram_business_content_publish
+     &response_type=code
+     &state={state}
+     [&extras={"force_reauth":true}]  ← forceReauth=true のとき付与
+⑤ レスポンス: { url: "https://www.instagram.com/oauth/authorize?..." }
+```
+
+---
+
+### 2.8 `completeInstagramOAuth` — Callable（2026-06-13追加）
+
+`/instagram/callback` ページから呼ばれる。認証不要（state が秘匿情報として機能）。
+
+**処理フロー：**
+```
+① 引数: { code, state } を受け取る
+② Firestore トランザクション: oauthStates/{state} を検証
+   ├── ドキュメントが存在しない → エラー（無効なstate）
+   ├── expiresAt < now → エラー（期限切れ）
+   ├── used === true → エラー（使用済み）
+   └── 検証OK → used: true, usedAt: now に書き換えてトランザクション完了
+③ code → 短期トークン交換：
+   POST https://api.instagram.com/oauth/access_token
+   （application/x-www-form-urlencoded）
+④ 短期トークン → 長期トークン交換：
+   GET https://graph.instagram.com/access_token?grant_type=ig_exchange_token&...
+⑤ 長期トークンで /me エンドポイントを呼び igUserId / username を取得
+⑥ Firestore: instagramAccounts/{igUserId} にアカウント情報とトークンを upsert
+⑦ レスポンス: { success: true, username }
 ```
 
 ---
@@ -237,6 +285,12 @@ async function sendLineNotify(message: string): Promise<void> {
 再試行間隔: 5分
 タスクのTTL: 7日
 ```
+
+---
+
+## 4-A. `testInstagramPost` の変更点（2026-06-13）
+
+テスト投稿用 Callable 関数。失敗時に Meta API のエラーコード・メッセージを管理画面へそのまま返すように改善した（以前はログにしか出なかったため、トラブルシューティングに管理画面から即時確認できるようになった）。
 
 ---
 

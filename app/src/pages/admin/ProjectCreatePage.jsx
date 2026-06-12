@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { collection, addDoc, doc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { collection, addDoc, doc, setDoc, getDocs, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
 import { db } from '../../firebase/config';
 import { toast } from '../../components/Toast';
@@ -84,6 +84,8 @@ export default function ProjectCreatePage() {
   const [saving, setSaving]             = useState(false);
   const [confirmUrl, setConfirmUrl]     = useState('');
   const [copied, setCopied]             = useState(false);
+  const [igAccounts, setIgAccounts]     = useState([]); // { id, username }[]
+  const [selectedIgAccountId, setSelectedIgAccountId] = useState('');
 
   // 2日後をdate形式（YYYY-MM-DD）で返す
   function defaultDeadlineValue() {
@@ -101,6 +103,16 @@ export default function ProjectCreatePage() {
     const pad = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T18:00`;
   }
+
+  useEffect(() => {
+    getDocs(collection(db, 'instagramAccounts'))
+      .then(snap => {
+        const accounts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setIgAccounts(accounts);
+        if (accounts.length > 0) setSelectedIgAccountId(accounts[0].id);
+      })
+      .catch(() => {});
+  }, []);
 
   // 枚数変更：既存の写真を保持しつつ配列サイズを変更
   function handleMainCountChange(n) {
@@ -218,6 +230,11 @@ export default function ProjectCreatePage() {
         currentRound: 1, approvedCount: 0,
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         lastFeedbackAt: null, allApprovedAt: null,
+        ...(igAccounts.length >= 2
+          ? { instagramAccountId: selectedIgAccountId }
+          : igAccounts.length === 1
+            ? { instagramAccountId: igAccounts[0].id }
+            : {}),
       });
 
       // 確認URL用のトークン→projectId ルックアップ（未認証クライアントは projects を list できないため）
@@ -439,6 +456,20 @@ export default function ProjectCreatePage() {
         </div>
         <div style={{ padding: '0 14px 32px' }}>
           <StepBar current={3} />
+          {igAccounts.length >= 2 && (
+            <div style={card}>
+              <label style={lbl}>投稿先Instagramアカウント</label>
+              <select
+                value={selectedIgAccountId}
+                onChange={e => setSelectedIgAccountId(e.target.value)}
+                style={inp}>
+                {igAccounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>@{acc.username}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div style={card}>
             <label style={lbl}>投稿予定日時</label>
             <input type="datetime-local" value={scheduledDatetime} onChange={e => setScheduledDatetime(e.target.value)} style={inp} />

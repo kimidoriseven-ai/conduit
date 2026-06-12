@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
-import { doc, setDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
-import { db } from '../../firebase/config';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../firebase/config';
+import { toast } from '../../components/Toast';
 import usePageTitle from '../../hooks/usePageTitle';
+
+const createInstagramConnectLink = httpsCallable(functions, 'createInstagramConnectLink');
 
 const GRAD = 'linear-gradient(135deg, #833AB4 0%, #E1306C 50%, #F77737 100%)';
 
@@ -15,7 +19,14 @@ export default function SettingsPage() {
   const [savedAt,     setSavedAt]     = useState(null);
   const [hasSaved,    setHasSaved]    = useState(false);
 
-  // Instagram設定
+  // Instagram OAuth連携
+  const [igAccounts,      setIgAccounts]      = useState([]); // { id, username, expiresAt, connectedAt }
+  const [igLinkLoading,   setIgLinkLoading]   = useState(false);
+  const [igLinkUrl,       setIgLinkUrl]       = useState('');
+  const [igLinkCopied,    setIgLinkCopied]    = useState(false);
+  const [igForceReauth,   setIgForceReauth]   = useState(false);
+
+  // Instagram設定（旧方式）
   const [igAccountId,  setIgAccountId]  = useState('');
   const [igToken,      setIgToken]      = useState('');
   const [igSaving,     setIgSaving]     = useState(false);
@@ -31,9 +42,10 @@ export default function SettingsPage() {
   useEffect(() => {
     async function loadStatus() {
       try {
-        const [lineSnap, igSnap] = await Promise.all([
+        const [lineSnap, igSnap, igAccountsSnap] = await Promise.all([
           getDoc(doc(db, 'systemConfig', 'lineNotify')),
           getDoc(doc(db, 'systemConfig', 'instagram')),
+          getDocs(collection(db, 'instagramAccounts')),
         ]);
         if (lineSnap.exists() && lineSnap.data().accessToken) {
           setHasSaved(true);
@@ -49,10 +61,36 @@ export default function SettingsPage() {
             accountId: d.accountId,
           });
         }
+        const accounts = igAccountsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setIgAccounts(accounts);
       } catch {}
     }
     loadStatus();
   }, []);
+
+  async function handleIgLinkIssue() {
+    setIgLinkLoading(true);
+    setIgLinkUrl('');
+    setIgLinkCopied(false);
+    try {
+      const result = await createInstagramConnectLink({ forceReauth: igForceReauth });
+      setIgLinkUrl(result.data.url);
+    } catch (e) {
+      toast('連携リンクの発行に失敗しました。' + (e.message || ''));
+    } finally {
+      setIgLinkLoading(false);
+    }
+  }
+
+  function copyIgLink() {
+    navigator.clipboard.writeText(igLinkUrl);
+    setIgLinkCopied(true);
+    setTimeout(() => setIgLinkCopied(false), 2000);
+  }
+
+  function shareIgLinkLine() {
+    window.open(`https://line.me/R/msg/text/?${encodeURIComponent('Instagram連携のお願いです。こちらのリンクからログインしてください🙏\n' + igLinkUrl)}`);
+  }
 
   async function saveIgSettings() {
     if (!igAccountId.trim() || !igToken.trim()) return;
@@ -173,14 +211,98 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {/* Instagram設定 */}
+        {/* Instagram OAuth連携カード */}
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#fff" stroke="none"/></svg>
             </div>
             <div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>Instagram 設定</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>Instagram 連携</p>
+              <p style={{ fontSize: 11, color: '#AAA', margin: 0 }}>OAuthで連携済みのアカウント一覧</p>
+            </div>
+          </div>
+
+          {/* 連携済みアカウント一覧 */}
+          {igAccounts.length === 0 ? (
+            <p style={{ fontSize: 13, color: '#AAA', textAlign: 'center', margin: '0 0 14px', lineHeight: 1.6 }}>
+              連携済みのアカウントはありません
+            </p>
+          ) : (
+            <div style={{ marginBottom: 14 }}>
+              {igAccounts.map(acc => (
+                <div key={acc.id} style={{ background: '#F7F7F7', borderRadius: 10, padding: '9px 12px', marginBottom: 8 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', margin: '0 0 2px' }}>@{acc.username}</p>
+                  <p style={{ fontSize: 11, color: '#AAA', margin: 0 }}>
+                    トークン期限：{acc.tokenExpiresAt?.toDate?.()?.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) || '—'}
+                    　接続日：{acc.connectedAt?.toDate?.()?.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) || '—'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ログイン画面の強制表示オプション */}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={igForceReauth} onChange={e => setIgForceReauth(e.target.checked)}
+              style={{ marginTop: 2, accentColor: '#833AB4', width: 15, height: 15, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: '#666', lineHeight: 1.6 }}>
+              ログイン画面を必ず表示する<br />
+              <span style={{ fontSize: 11, color: '#AAA' }}>自分の端末から別のアカウントを選んで連携するときにオン。クライアントに送る場合はオフのまま（ログイン済みならワンタップで完了）</span>
+            </span>
+          </label>
+
+          {/* 連携リンク発行ボタン */}
+          <button
+            onClick={handleIgLinkIssue}
+            disabled={igLinkLoading}
+            style={{
+              width: '100%', padding: '10px 0', borderRadius: 20, border: 'none',
+              cursor: igLinkLoading ? 'not-allowed' : 'pointer',
+              background: igLinkLoading ? '#E0E0E0' : GRAD,
+              color: igLinkLoading ? '#AAA' : '#fff',
+              fontSize: 13, fontWeight: 600, ...font, marginBottom: igLinkUrl ? 10 : 0,
+            }}>
+            {igLinkLoading ? '発行中...' : '連携リンクを発行'}
+          </button>
+
+          {/* 発行済みリンク表示 */}
+          {igLinkUrl && (<>
+            <label style={{ ...lbl, marginTop: 4 }}>連携リンク</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+              <input type="text" readOnly value={igLinkUrl}
+                style={{ ...inp, fontSize: 12, color: '#555', flex: 1 }} />
+              <button onClick={copyIgLink}
+                style={{ flexShrink: 0, padding: '10px 14px', borderRadius: 12, border: 'none', background: GRAD, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', ...font }}>
+                {igLinkCopied ? '✓' : 'コピー'}
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <button onClick={shareIgLinkLine}
+                style={{ flex: 1, padding: 10, borderRadius: 16, border: '0.5px solid #E8E8E8', background: '#fff', fontSize: 12, cursor: 'pointer', ...font, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, color: '#1a1a1a' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#06C755" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                LINEで送る
+              </button>
+              <a href={igLinkUrl} target="_blank" rel="noopener noreferrer"
+                style={{ flex: 1, padding: 10, borderRadius: 16, border: '0.5px solid #E8E8E8', background: '#fff', fontSize: 12, cursor: 'pointer', ...font, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, color: '#1a1a1a', textDecoration: 'none' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                このブラウザで開く
+              </a>
+            </div>
+            <p style={{ fontSize: 11, color: '#AAA', margin: 0, lineHeight: 1.6 }}>
+              ※リンクの有効期限は30分・1回限り有効です。連携するInstagramアカウントは、事前にMetaアプリの「Instagramテスター」に追加し、Instagramアプリ側で招待を承認しておく必要があります。
+            </p>
+          </>)}
+        </div>
+
+        {/* Instagram手動設定（旧方式） */}
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: GRAD, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#fff" stroke="none"/></svg>
+            </div>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>Instagram手動設定（旧方式・通常は使いません）</p>
               <p style={{ fontSize: 11, color: '#AAA', margin: 0 }}>自動投稿に使用するアカウント（共通設定）</p>
             </div>
           </div>

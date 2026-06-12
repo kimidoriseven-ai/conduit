@@ -9,6 +9,8 @@ Firestore
 │   ├── photos/{photoId}                  ← 写真1枚のデータ
 │   └── feedbackRounds/{roundId}          ← フィードバック提出単位
 │
+├── instagramAccounts/{igUserId}          ← OAuth連携済みInstagramアカウント
+├── oauthStates/{state}                   ← OAuthワンタイムstate（Admin SDKのみ）
 └── systemConfig/lineNotify               ← LINEトークンなどシステム設定
 ```
 
@@ -26,9 +28,7 @@ Firestore
 | `approvedCount` | number | 承認済み枚数 |
 | `rejectedCount` | number | NG枚数 |
 | `scheduledAt` | timestamp | 投稿予定日時 |
-| `instagramAccountId` | string | Instagram Business Account ID |
-| `instagramAccessToken` | string | アクセストークン |
-| `instagramTokenExpiresAt` | timestamp | トークン有効期限（60日） |
+| `instagramAccountId` | string | 投稿先 `instagramAccounts` の igUserId（任意。2件以上連携時に案件ごと指定） |
 | `currentRound` | number | 現在のフィードバックラウンド |
 | `lastFeedbackAt` | timestamp | 最終フィードバック日時 |
 | `allApprovedAt` | timestamp | 全承認日時 |
@@ -82,6 +82,35 @@ draft → waiting_review → feedback_received → in_revision → waiting_revie
 | `isAllApproved` | boolean | |
 | `submittedAt` | timestamp | |
 
+## instagramAccounts コレクション
+
+OAuth連携済みInstagramアカウント。ドキュメントIDは `igUserId`。
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `igUserId` | string | Instagram ユーザーID（ドキュメントIDと同値） |
+| `username` | string | Instagramユーザー名（@なし） |
+| `accessToken` | string | Long-lived アクセストークン |
+| `tokenExpiresAt` | timestamp | トークン有効期限 |
+| `connectedAt` | timestamp | 初回連携日時 |
+| `tokenRefreshedAt` | timestamp | 最終自動更新日時 |
+| `updatedAt` | timestamp | 最終更新日時 |
+
+**セキュリティルール：** 管理者のみ読み書き可。
+
+## oauthStates コレクション
+
+OAuthフローのワンタイムstate。ドキュメントIDは state 文字列。
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `createdAt` | timestamp | 発行日時 |
+| `expiresAt` | timestamp | 有効期限（発行から30分） |
+| `used` | boolean | 使用済みフラグ |
+| `usedAt` | timestamp \| null | 使用日時 |
+
+**セキュリティルール：** クライアントアクセス全拒否。Admin SDK（Cloud Functions）のみ読み書き可。
+
 ## systemConfig/lineNotify
 
 | フィールド | 型 | 説明 |
@@ -103,4 +132,6 @@ draft → waiting_review → feedback_received → in_revision → waiting_revie
 | `projects` | 全員OK（確認URLアクセス） | 管理者のみ（更新は限定フィールドのみクライアント可） |
 | `projects/photos` | 全員OK | 管理者のみ（ステータス更新のみクライアント可） |
 | `projects/feedbackRounds` | 管理者のみ | 管理者 + クライアント（新規作成のみ） |
+| `instagramAccounts` | 管理者のみ | 管理者のみ |
+| `oauthStates` | 不可（Admin SDKのみ） | 不可（Admin SDKのみ） |
 | `systemConfig` | 読み取り不可 | 管理者のみ |

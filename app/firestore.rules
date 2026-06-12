@@ -62,5 +62,15 @@ service cloud.firestore {
     match /systemConfig/{docId} {
       allow read, write: if isAdmin();
     }
+
+    // instagramAccounts: OAuth連携したアカウント（トークン含む）— 管理者のみ
+    match /instagramAccounts/{accountId} {
+      allow read, write: if isAdmin();
+    }
+
+    // oauthStates: OAuthワンタイムstate — Cloud Functions(Admin SDK)のみが触る
+    match /oauthStates/{stateId} {
+      allow read, write: if false;
+    }
   }
 }

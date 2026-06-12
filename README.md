@@ -2,11 +2,11 @@
 
 Instagram投稿代行サービスのための、投稿確認・承認・自動投稿アプリ。
 
-> 📌 本リポジトリは実運用中アプリの**公開用スナップショット**です。クライアントのプライバシー保護のため、実写真を含む操作マニュアル・スクリーンショット類は除外しています。
-
 投稿予定の写真をクライアントがスマホで確認し、OK/NG・手書き書き込み・差し替え指示をワンタップでフィードバック。全員の承認が揃ったら、設定日時にInstagramへ自動でカルーセル投稿します。
 
-## 本番URL・ライブデモ
+> 📌 本リポジトリは実運用中アプリの**公開用スナップショット**です。クライアントのプライバシー保護のため、実写真を含む操作マニュアル・スクリーンショット類は除外しています。
+
+## 本番URL
 
 - **カスタムドメイン**: https://conduit-app.com
 - **Firebase Hosting**: https://instagram-post-confirm.web.app
@@ -31,7 +31,7 @@ Instagram投稿代行サービスのための、投稿確認・承認・自動�
 - 確認URLのワンタップ発行・コピー・LINE共有（有効期限つき）
 - フィードバックを確認者ごと・ラウンドごとにリアルタイム表示
 - 修正版の再アップロード → 同じURLで再確認依頼
-- Instagram連携・LINE通知トークンの管理画面
+- Instagram OAuth連携（連携リンク発行・複数アカウント対応）・LINE通知トークンの管理画面
 
 ### 自動化（Cloud Functions）
 
@@ -59,6 +59,7 @@ Instagram投稿代行サービスのための、投稿確認・承認・自動�
 - 管理者判定はFirestore/Storageルール・Cloud Functionsの3層すべてで**特定アカウントのみ**に限定
 - クライアントが書き込めるのはフィードバック送信に必要なフィールドのみ（ルールで`affectedKeys`を制限）
 - 手書き画像のアップロードはPNG・5MB未満に制限
+- Instagram OAuth連携はワンタイムstateによるCSRF対策（30分有効・1回限り消費）
 
 ## データモデル（Firestore）
 
@@ -72,6 +73,8 @@ projects/{projectId}                 … 1案件 = 1カルーセル投稿
         └── photoFeedbacks: { [photoId]: { status, comment, drawingStorageUrl, replaceWithPhotoId } }
 
 confirmLinks/{token}                 … 確認URLトークン → projectId のルックアップ
+instagramAccounts/{igUserId}         … OAuth連携したIGアカウント（トークン・自動更新対象。管理者のみ）
+oauthStates/{state}                  … OAuth用ワンタイムstate（30分・1回限り。Functionsのみアクセス）
 systemConfig/{instagram | lineNotify} … APIトークン（管理者のみアクセス可）
 ```
 

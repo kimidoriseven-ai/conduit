@@ -1,8 +1,9 @@
 # Firestore データモデル設計書
 ## Instagram投稿確認WEBアプリ
 
-**バージョン：** 1.0  
+**バージョン：** 1.1  
 **作成日：** 2026-05-16  
+**最終更新：** 2026-06-13（Instagram OAuth連携に伴う `instagramAccounts` / `oauthStates` コレクション追加、`projects` に `instagramAccountId` 追加）  
 **対象技術：** Firebase Firestore / Firebase Storage / Firebase Auth
 
 ---
@@ -12,12 +13,14 @@
 ```
 Firestore
 │
-├── clients/{clientId}                        ← クライアント情報・Instagramトークン
+├── clients/{clientId}                        ← クライアント情報・Instagramトークン（旧方式用・残置）
 │
 ├── projects/{projectId}                      ← 案件（投稿1回分）
 │   ├── photos/{photoId}                      ← 写真1枚分のデータ
 │   └── feedbackRounds/{roundId}              ← フィードバック提出単位（1〜3回）
 │
+├── instagramAccounts/{igUserId}              ← OAuth連携済みInstagramアカウント（2026-06-13追加）
+├── oauthStates/{state}                       ← OAuthワンタイムstate（Admin SDKのみ。2026-06-13追加）
 └── systemConfig/lineNotify                   ← LINE Notifyトークンなどシステム設定
 ```
 
@@ -97,6 +100,7 @@ interface Client {
 | `caption` | string | 共通キャプション（2200文字以内） | `"春の新作..."` |
 | `hashtags` | string | 共通ハッシュタグ（スペース区切り、30個以内） | `"#春コーデ #ootd"` |
 | `defaultScheduledAt` | Timestamp | デフォルト投稿日時（当日18:00） | |
+| `instagramAccountId` | string \| null | 投稿先の `instagramAccounts` igUserId（任意。連携アカウントが2件以上の場合に案件ごと指定） | `"12345678"` |
 | `currentRound` | number | 現在のフィードバック回次（1〜） | `1` |
 | `approvedCount` | number | 現在のOK枚数（進捗表示用） | `4` |
 | `createdAt` | Timestamp | 案件作成日時 | |
@@ -303,6 +307,62 @@ interface FeedbackRound {
 
 ---
 
+### 2.6 `instagramAccounts` コレクション（2026-06-13追加）
+
+OAuth連携済みInstagramアカウントを管理する。ドキュメントIDは Instagram ユーザーID（`igUserId`）。  
+**⚠️ accessToken はサーバーサイド（Cloud Functions）からのみ読み書き可。**
+
+```
+/instagramAccounts/{igUserId}
+```
+
+| フィールド | 型 | 説明 | 例 |
+|-----------|-----|------|-----|
+| `igUserId` | string | Instagram ユーザーID（ドキュメントIDと同値） | `"12345678"` |
+| `username` | string | Instagramユーザー名（@なし） | `"client_shop"` |
+| `accessToken` | string | Long-lived アクセストークン（60日有効） | `"IGAAx..."` |
+| `tokenExpiresAt` | Timestamp | トークン有効期限 | |
+| `connectedAt` | Timestamp | 初回OAuth連携日時 | |
+| `tokenRefreshedAt` | Timestamp \| null | 最終自動更新日時 | |
+| `updatedAt` | Timestamp | 最終更新日時 | |
+
+**セキュリティルール：** 管理者（Firebase Auth ログイン済み）のみ読み書き可。
+
+**TypeScript型定義：**
+```typescript
+interface InstagramAccount {
+  igUserId: string;
+  username: string;
+  accessToken: string;         // Cloud Functions のみアクセス可
+  tokenExpiresAt: Timestamp;
+  connectedAt: Timestamp;
+  tokenRefreshedAt: Timestamp | null;
+  updatedAt: Timestamp;
+}
+```
+
+---
+
+### 2.7 `oauthStates` コレクション（2026-06-13追加）
+
+Instagram OAuth フロー用ワンタイムstate。CSRF対策のため Admin SDK（Cloud Functions）のみがアクセスする。  
+ドキュメントIDは state 文字列（cryptographically random UUID）。
+
+```
+/oauthStates/{state}
+```
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `createdAt` | Timestamp | 発行日時 |
+| `expiresAt` | Timestamp | 有効期限（発行から30分） |
+| `used` | boolean | 使用済みフラグ（トランザクションで `true` に書き換え） |
+| `usedAt` | Timestamp \| null | 消費日時 |
+
+**セキュリティルール：** クライアントアクセス全拒否。Admin SDK のみ読み書き可。
+
+---
+
 ## 3. Firebase Storage 構造
 
 ```
@@ -346,6 +406,13 @@ Firebase Storage
 /projects/{projectId}/feedbackRounds/{roundId}
   - read: 業者ログインユーザーのみ
   - write: Cloud Functions のみ（フィードバック送信エンドポイント）
+
+/instagramAccounts/{igUserId}
+  - read/write: 業者ログインユーザーのみ
+  ⚠️ accessToken フィールドは Cloud Functions のみアクセス可
+
+/oauthStates/{state}
+  - read/write: 全拒否（Admin SDK = Cloud Functions のみ）
 
 /systemConfig/{docId}
   - read/write: Cloud Functions のみ

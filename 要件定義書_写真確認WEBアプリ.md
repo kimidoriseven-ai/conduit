@@ -1,10 +1,16 @@
 ﻿# 要件定義書：Instagram投稿確認WEBアプリ
 
-**バージョン：** 2.1  
+**バージョン：** 2.2  
 **作成日：** 2026-05-15  
-**最終更新：** 2026-06-10  
+**最終更新：** 2026-06-13  
 **作成者：** 管理者
 
+> **v2.2 改訂概要（2026-06-13 Instagram OAuth連携 実装完了）**
+> - Instagram連携を **OAuth方式（Instagram API with Instagram Login）** に変更。Metaアプリは開発モードのまま運用し、連携アカウントを「Instagramテスター」に登録する方式（アプリ審査不要）
+> - 連携フロー：管理画面でワンタイムリンク発行（30分有効・1回限り）→ クライアントがInstagramログイン → `/instagram/callback` → `instagramAccounts/{igUserId}` にトークン自動保存
+> - トークンはアカウント別に `instagramAccounts` コレクションで管理。Cloud Function `refreshAccessTokens` が毎日自動リフレッシュ（旧 `systemConfig/instagram` との後方互換を維持）
+> - 本番環境で実投稿まで動作確認済み（2026-06-13）
+>
 > **v2.1 改訂概要（2026-06-10 設計レビュー）**
 > - 1案件＝1カルーセル投稿に統一（写真ごとのキャプション・投稿日時は廃止 → 投稿全体で共通）
 > - 投稿予定枚数の最大上限を 30枚 → **10枚** に修正（Instagram Graph APIのカルーセル投稿上限）
@@ -150,22 +156,29 @@ Instagram投稿代行サービスにおいて、投稿予定の写真・キャ�
 ### 5.1 初回セットアップフロー（クライアント1人につき1回）
 
 ```
-1. クライアントのInstagram BusinessアカウントがFacebookページと連携済みであること
-2. 業者が管理画面の「Instagram連携」ボタンを押す
-3. クライアントのFacebookアカウントでOAuth認証を行う（業者が代理操作でも可）
-4. 付与される権限：instagram_basic / instagram_content_publish / pages_read_engagement
-5. 取得したアクセストークンをFirestoreにサーバーサイドで安全に保存
-6. 以降はシステムが自動で投稿・トークン更新を行う
+1. 業者がMetaアプリ管理画面でクライアントのInstagramアカウントを「Instagramテスター」として招待
+2. クライアントがInstagramアプリ（設定 → アプリとウェブサイト → テスター招待）で招待を承認
+3. 業者が管理画面 → システム設定 → 「連携リンクを発行」
+   （「ログイン画面を必ず表示する」オプションで force_reauth=true を付与可能）
+4. 発行したリンク（有効期限30分・1回限り）をLINE等でクライアントへ送付
+5. クライアントがリンクを開き、Instagram にログインして許可
+6. /instagram/callback にリダイレクトされ、Cloud Function がトークン取得・保存
+7. 管理画面の連携済み一覧に @ユーザー名 が表示されたら完了
+8. 以降はシステムが自動で投稿・トークン更新を行う（Metaアプリ審査不要）
 ```
+
+**使用API：** Instagram API with Instagram Login（instagram_business_basic / instagram_business_content_publish スコープ）
 
 ### 5.2 アクセストークン管理
 
 | 項目 | 内容 |
 |------|------|
 | トークン種別 | Long-lived User Access Token（有効期限60日） |
-| 保存場所 | Firebase Firestore（サーバーサイドのみ） |
-| 更新タイミング | 有効期限5日前にCloud Functionsが自動リフレッシュ |
-| 失効時の対応 | 業者にLINE通知 → 管理画面から再認証 |
+| 保存場所 | Firestore `instagramAccounts/{igUserId}`（サーバーサイドのみ・管理者のみ読み書き可） |
+| 取得方法 | OAuth連携フローで自動取得（手動貼り付けは旧方式として予備機能で残置） |
+| 更新タイミング | 有効期限5日前にCloud Function `refreshAccessTokens` が毎日自動リフレッシュ |
+| 複数アカウント対応 | 複数アカウントを連携でき、案件ごとに投稿先を指定できる（1件のみの場合は自動設定） |
+| 失効時の対応 | 業者にアカウント名つきLINE通知 → 管理画面から再連携（連携リンクを再発行） |
 
 ### 5.3 Instagram Graph API制約
 

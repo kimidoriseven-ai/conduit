@@ -4,9 +4,10 @@ import { useAuth } from './hooks/useAuth';
 import { Toaster } from './components/Toast';
 
 // ルートごとにチャンクを分割（クライアント確認ページに管理画面のコードを配信しない）
-const ConfirmPage      = lazy(() => import('./pages/ConfirmPage'));
-const CompletePage     = lazy(() => import('./pages/CompletePage'));
-const InvalidTokenPage = lazy(() => import('./pages/InvalidTokenPage'));
+const ConfirmPage            = lazy(() => import('./pages/ConfirmPage'));
+const CompletePage           = lazy(() => import('./pages/CompletePage'));
+const InvalidTokenPage       = lazy(() => import('./pages/InvalidTokenPage'));
+const InstagramCallbackPage  = lazy(() => import('./pages/InstagramCallbackPage'));
 
 const LoginPage         = lazy(() => import('./pages/admin/LoginPage'));
 const DashboardPage     = lazy(() => import('./pages/admin/DashboardPage'));
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/confirm/:token" element={<ConfirmPage />} />
           <Route path="/confirm/:token/complete" element={<CompletePage />} />
           <Route path="/invalid-url" element={<InvalidTokenPage />} />
+          <Route path="/instagram/callback" element={<InstagramCallbackPage />} />
 
           {/* 業者管理画面（要ログイン） */}
           <Route path="/admin/login" element={<LoginPage />} />
